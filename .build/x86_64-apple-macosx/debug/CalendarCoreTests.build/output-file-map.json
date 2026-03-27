@@ -1,0 +1,33 @@
+{
+  "": {
+    "swift-dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/master.swiftdeps"
+  },
+  "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/Tests/CalendarCoreTests/MonthTests.swift": {
+    "dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/MonthTests.d",
+    "object": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/MonthTests.swift.o",
+    "swiftmodule": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/MonthTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/MonthTests.swiftdeps",
+    "diagnostics": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/MonthTests.dia"
+  },
+  "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/Tests/CalendarCoreTests/RataDieTests.swift": {
+    "dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/RataDieTests.d",
+    "object": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/RataDieTests.swift.o",
+    "swiftmodule": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/RataDieTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/RataDieTests.swiftdeps",
+    "diagnostics": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/RataDieTests.dia"
+  },
+  "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/Tests/CalendarCoreTests/WeekdayTests.swift": {
+    "dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/WeekdayTests.d",
+    "object": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/WeekdayTests.swift.o",
+    "swiftmodule": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/WeekdayTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/WeekdayTests.swiftdeps",
+    "diagnostics": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/WeekdayTests.dia"
+  },
+  "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/Tests/CalendarCoreTests/YearInfoTests.swift": {
+    "dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/YearInfoTests.d",
+    "object": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/YearInfoTests.swift.o",
+    "swiftmodule": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/YearInfoTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/YearInfoTests.swiftdeps",
+    "diagnostics": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/CalendarCoreTests.build/YearInfoTests.dia"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/SwiftICUPackageTests.build/master.swiftdeps"
+  },
+  "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/SwiftICUPackageTests.derived/runner.swift": {
+    "dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/SwiftICUPackageTests.build/runner.d",
+    "object": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/SwiftICUPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/SwiftICUPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/SwiftICUPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift/.build/x86_64-apple-macosx/debug/SwiftICUPackageTests.build/runner.dia"
+  }
+}
