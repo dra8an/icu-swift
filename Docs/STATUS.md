@@ -1,6 +1,6 @@
 # icu4swift — Project Status
 
-*Last updated: 2026-03-27*
+*Last updated: 2026-03-29*
 
 ## Overall Progress
 
@@ -8,17 +8,17 @@
 Phase 1:  CalendarCore           ████████████████████ DONE
 Phase 2:  CalendarSimple         ████████████████████ DONE
 Phase 3:  CalendarComplex        ████████████████████ DONE
+Phase 7:  DateArithmetic         ████████████████████ DONE
 Phase 4a: AstronomicalEngine     ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 4b: CalendarAstronomical   ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 5:  CalendarHindu          ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 6:  CalendarJapanese       ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
-Phase 7:  DateArithmetic         ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 8:  DateFormat             ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 9:  DateParse              ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 10: DateFormatInterval     ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 ```
 
-**Calendars: 10 of 22 implemented. Formatting: not started.**
+**Calendars: 10 of 22 implemented. Arithmetic: done. Formatting: not started.**
 
 ## What's Done
 
@@ -64,6 +64,22 @@ Five calendars with non-trivial algorithmic rules.
 
 Shared arithmetic: `HebrewArithmetic`, `CopticArithmetic` (Coptic+Ethiopian), `PersianArithmetic`.
 
+### Phase 7: DateArithmetic (2 files, 24 tests)
+
+Date addition, difference, and field balancing — works with all 10 calendars.
+
+| Type | What |
+|------|------|
+| `DateDuration` | Signed duration: years, months, weeks, days + isNegative flag |
+| `Overflow` | `.constrain` (clamp to valid) or `.reject` (throw error) |
+| `DateDurationUnit` | `.years`, `.months`, `.weeks`, `.days` |
+| `DateAddError` | Overflow, invalid day, month-not-in-year |
+| `Date.added(_:overflow:)` | Temporal NonISODateAdd algorithm |
+| `Date.until(_:largestUnit:)` | Temporal NonISODateUntil algorithm |
+| `DateArithmeticHelper.balance()` | Temporal BalanceNonISODate |
+
+See `Docs/DateArithmetic.md` for algorithm details.
+
 ### Test Coverage
 
 | Suite | Tests | Verified Against |
@@ -80,10 +96,14 @@ Shared arithmetic: `HebrewArithmetic`, `CopticArithmetic` (Coptic+Ethiopian), `P
 | Ethiopian | 10 | ICU4X Amete Mihret/Alem, leap year, regression #2254 |
 | Persian | 8 | 21 R&D pairs, 293 U. Tehran Nowruz dates |
 | Indian | 9 | ICU4X 8 roundtrip pairs, epoch, near-zero |
-| **Total** | **127** | |
+| DateDuration | 2 | Factory methods, weeks/days decomposition |
+| Date Addition | 14 | ICU4X `iso.rs` offset tests, month-end clamping, combined durations |
+| Date Difference | 5 | Day/week/year-month diff, round-trip verification |
+| Day Arithmetic | 1 | Exhaustive: every day in 2000-2001 × 5 offsets |
+| **Total** | **151** | |
 
 ## What's Not Done
 
 See `Docs/NEXT.md` for prioritized next steps.
 
-12 remaining calendar systems + all formatting/parsing/arithmetic infrastructure.
+12 remaining calendar systems + formatting/parsing infrastructure.

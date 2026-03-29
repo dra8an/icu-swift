@@ -84,3 +84,4 @@ Algorithms ported from:
 - `Docs/ICU4C_vs_ICU4X_DateFormat_Analysis.md` — detailed comparison of formatting approaches
 - `Docs/Swift_Calendar_Library_Architecture.md` — architectural decisions and rationale
 - `Docs/Swift_Implementation_Plan.md` — full 10-phase implementation plan with API sketches
+- `Docs/DateArithmetic.md` — Phase 7 design: Temporal algorithms, API, overflow semantics

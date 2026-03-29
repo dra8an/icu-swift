@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "CalendarCore", targets: ["CalendarCore"]),
         .library(name: "CalendarSimple", targets: ["CalendarSimple"]),
         .library(name: "CalendarComplex", targets: ["CalendarComplex"]),
+        .library(name: "DateArithmetic", targets: ["DateArithmetic"]),
     ],
     targets: [
         .target(
@@ -38,10 +39,20 @@ let package = Package(
             dependencies: ["CalendarSimple", "CalendarCore"],
             path: "Tests/CalendarSimpleTests"
         ),
+        .target(
+            name: "DateArithmetic",
+            dependencies: ["CalendarCore"],
+            path: "Sources/DateArithmetic"
+        ),
         .testTarget(
             name: "CalendarComplexTests",
             dependencies: ["CalendarComplex", "CalendarSimple", "CalendarCore"],
             path: "Tests/CalendarComplexTests"
+        ),
+        .testTarget(
+            name: "DateArithmeticTests",
+            dependencies: ["DateArithmetic", "CalendarSimple", "CalendarCore"],
+            path: "Tests/DateArithmeticTests"
         ),
     ]
 )

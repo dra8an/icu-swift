@@ -4,23 +4,23 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 
 ## Calendar Systems
 
-10 calendar systems implemented across 3 targets:
+10 calendar systems and date arithmetic implemented across 4 targets:
 
-| Target | Calendars | Notes |
-|--------|-----------|-------|
-| **CalendarCore** | *(protocols and types)* | `CalendarProtocol`, `Date<C>`, `RataDie`, `Month`, `Weekday`, `YearInfo` |
+| Target | What | Notes |
+|--------|------|-------|
+| **CalendarCore** | Protocols and types | `CalendarProtocol`, `Date<C>`, `RataDie`, `Month`, `Weekday`, `YearInfo` |
 | **CalendarSimple** | ISO, Gregorian, Julian, Buddhist, ROC | Gregorian-family arithmetic with era/offset variants |
 | **CalendarComplex** | Hebrew, Coptic, Ethiopian, Persian, Indian | Lunisolar, 13-month, and solar calendars |
+| **DateArithmetic** | `DateDuration`, add/until | Temporal-spec algorithms, works with all calendars |
 
 ### Planned
 
-| Target | Calendars |
-|--------|-----------|
+| Target | What |
+|--------|------|
 | **AstronomicalEngine** | Moshier + Reingold hybrid engine |
 | **CalendarAstronomical** | Chinese, Dangi, Islamic (Tabular, Umm al-Qura, Observational) |
 | **CalendarHindu** | Lunisolar (Amanta, Purnimanta), Solar (Tamil, Bengali, Odia, Malayalam) |
 | **CalendarJapanese** | Japanese (era data) |
-| **DateArithmetic** | `DateDuration`, add/roll/difference |
 | **DateFormat** | Semantic skeletons, raw patterns, CLDR data |
 | **DateParse** | Pattern-based parsing |
 | **DateFormatInterval** | Interval and relative formatting |
@@ -52,6 +52,21 @@ let bce = try Date(year: .eraYear(era: "bce", year: 44), month: 3, day: 15, cale
 // All conversions go through RataDie (hub-and-spoke)
 let persian = Persian()
 let nowruz = bce.converting(to: persian)
+
+// Date arithmetic (works with any calendar)
+import DateArithmetic
+
+let date = try Date(year: 1992, month: 9, day: 2, calendar: iso)
+let later = try date.added(DateDuration(years: 1, months: 2, weeks: 3, days: 4))
+// later = 1993-11-27
+
+// Month-end clamping: Jan 31 + 1 month = Feb 28 (constrain) or error (reject)
+let jan31 = try Date(year: 2021, month: 1, day: 31, calendar: iso)
+let feb28 = try jan31.added(.forMonths(1), overflow: .constrain)
+
+// Compute difference between dates
+let diff = date.until(later, largestUnit: .years)
+// diff = 1 year, 2 months, 25 days
 ```
 
 ## Architecture
@@ -92,7 +107,7 @@ targets: [
 
 ## Testing
 
-127 tests across 19 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
+151 tests across 23 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
 
 ```bash
 swift test
@@ -104,6 +119,7 @@ Test data includes:
 - 48 ISO-Hebrew date pairs from ICU4X
 - Round-trip verification over tens of thousands of dates per calendar
 - Directionality checks ensuring RataDie ordering matches YMD ordering
+- Exhaustive day arithmetic: every day in 2000-2001 tested with multiple offsets
 
 ## Sources
 
