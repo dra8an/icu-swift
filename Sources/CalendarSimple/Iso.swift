@@ -108,11 +108,17 @@ public struct Iso: CalendarProtocol, Sendable {
 /// Buddhist, and ROC calendars since they all share Gregorian arithmetic.
 public struct IsoDateInner: Equatable, Comparable, Hashable, Sendable {
     /// Extended year (year 0 exists, negative = BCE).
-    let year: Int32
+    public let year: Int32
     /// Month (1-12).
-    let month: UInt8
+    public let month: UInt8
     /// Day of month (1-31).
-    let day: UInt8
+    public let day: UInt8
+
+    public init(year: Int32, month: UInt8, day: UInt8) {
+        self.year = year
+        self.month = month
+        self.day = day
+    }
 
     public static func < (lhs: IsoDateInner, rhs: IsoDateInner) -> Bool {
         if lhs.year != rhs.year { return lhs.year < rhs.year }

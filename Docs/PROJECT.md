@@ -85,3 +85,4 @@ Algorithms ported from:
 - `Docs/Swift_Calendar_Library_Architecture.md` — architectural decisions and rationale
 - `Docs/Swift_Implementation_Plan.md` — full 10-phase implementation plan with API sketches
 - `Docs/DateArithmetic.md` — Phase 7 design: Temporal algorithms, API, overflow semantics
+- `Docs/CalendarJapanese.md` — Phase 6 design: era table, Meiji switchover, extensibility

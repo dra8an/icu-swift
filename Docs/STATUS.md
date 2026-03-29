@@ -8,17 +8,17 @@
 Phase 1:  CalendarCore           ████████████████████ DONE
 Phase 2:  CalendarSimple         ████████████████████ DONE
 Phase 3:  CalendarComplex        ████████████████████ DONE
+Phase 6:  CalendarJapanese       ████████████████████ DONE
 Phase 7:  DateArithmetic         ████████████████████ DONE
 Phase 4a: AstronomicalEngine     ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 4b: CalendarAstronomical   ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 5:  CalendarHindu          ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
-Phase 6:  CalendarJapanese       ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 8:  DateFormat             ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 9:  DateParse              ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 10: DateFormatInterval     ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 ```
 
-**Calendars: 10 of 22 implemented. Arithmetic: done. Formatting: not started.**
+**Calendars: 11 of 22 implemented. Arithmetic: done. Formatting: not started.**
 
 ## What's Done
 
@@ -80,6 +80,22 @@ Date addition, difference, and field balancing — works with all 10 calendars.
 
 See `Docs/DateArithmetic.md` for algorithm details.
 
+### Phase 6: CalendarJapanese (1 file, 15 tests)
+
+Gregorian arithmetic with Japanese imperial era overlay.
+
+| Era | Code | Start Date | Era Index |
+|-----|------|------------|-----------|
+| Meiji | `meiji` | 1868-10-23 | 2 |
+| Taisho | `taisho` | 1912-07-30 | 3 |
+| Showa | `showa` | 1926-12-25 | 4 |
+| Heisei | `heisei` | 1989-01-08 | 5 |
+| Reiwa | `reiwa` | 2019-05-01 | 6 |
+
+Dates before Meiji 6 (1873) fall back to `ce`/`bce` eras. `JapaneseEraData` is extensible for future eras.
+
+See `Docs/CalendarJapanese.md` for design details.
+
 ### Test Coverage
 
 | Suite | Tests | Verified Against |
@@ -100,10 +116,11 @@ See `Docs/DateArithmetic.md` for algorithm details.
 | Date Addition | 14 | ICU4X `iso.rs` offset tests, month-end clamping, combined durations |
 | Date Difference | 5 | Day/week/year-month diff, round-trip verification |
 | Day Arithmetic | 1 | Exhaustive: every day in 2000-2001 × 5 offsets |
-| **Total** | **151** | |
+| Japanese | 15 | ICU4X era boundaries, Meiji 6 switchover, datetime fixtures |
+| **Total** | **166** | |
 
 ## What's Not Done
 
 See `Docs/NEXT.md` for prioritized next steps.
 
-12 remaining calendar systems + formatting/parsing infrastructure.
+11 remaining calendar systems + formatting/parsing infrastructure.

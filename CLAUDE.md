@@ -8,7 +8,7 @@ icu4swift is a type-safe Swift calendar library porting algorithms from ICU4X (R
 
 ```bash
 swift build    # Build all targets
-swift test     # Run all 151 tests (takes ~1 second)
+swift test     # Run all 166 tests (takes ~1 second)
 ```
 
 No external dependencies. Swift 6.0, strict concurrency enabled.
@@ -20,11 +20,13 @@ Sources/
   CalendarCore/          # Protocols, RataDie, Date<C>, Month, Weekday, YearInfo, errors
   CalendarSimple/        # ISO, Gregorian, Julian, Buddhist, ROC + arithmetic helpers
   CalendarComplex/       # Hebrew, Coptic, Ethiopian, Persian, Indian + arithmetic helpers
+  CalendarJapanese/      # Japanese calendar with era data (Meiji→Reiwa)
   DateArithmetic/        # DateDuration, Date.added(), Date.until(), balance algorithm
 Tests/
   CalendarCoreTests/     # 26 tests for core types
   CalendarSimpleTests/   # 48 tests for simple calendars
   CalendarComplexTests/  # 53 tests for complex calendars
+  CalendarJapaneseTests/ # 15 tests for Japanese calendar
   DateArithmeticTests/   # 24 tests for date arithmetic
 Docs/                    # Architecture analysis and implementation plan
 ```
@@ -40,16 +42,18 @@ Docs/                    # Architecture analysis and implementation plan
 - **Coptic/Ethiopian** share `CopticArithmetic` — Ethiopian is Coptic with a different epoch offset.
 - **Persian** uses the fast 33-year rule with a 78-entry NON_LEAP_CORRECTION table, not the 2820-year cycle.
 - **DateArithmetic** depends only on CalendarCore — it extends `Date<C>` generically, so it works with any calendar without importing CalendarSimple/Complex. Uses the Temporal spec's NonISODateAdd / NonISODateUntil / BalanceNonISODate algorithms.
+- **CalendarJapanese** depends on CalendarSimple (shares `IsoDateInner` and `GregorianArithmetic`). `IsoDateInner` fields and init are `public` so CalendarJapanese can access them across module boundaries. `JapaneseEraData` is a struct with a sorted era table — extensible for future eras without code changes.
 
 ## Implementation Plan
 
-See `Docs/Swift_Implementation_Plan.md` for the full 10-phase plan. Phases 1-3 and 7 are complete:
+See `Docs/Swift_Implementation_Plan.md` for the full 10-phase plan. Phases 1-3, 6, and 7 are complete:
 - Phase 1: CalendarCore (done)
 - Phase 2: CalendarSimple — ISO, Gregorian, Julian, Buddhist, ROC (done)
 - Phase 3: CalendarComplex — Hebrew, Coptic, Ethiopian, Persian, Indian (done)
+- Phase 6: CalendarJapanese — Japanese with era data (done)
 - Phase 7: DateArithmetic — DateDuration, add/until/balance (done)
 
-Next phases: CalendarJapanese, AstronomicalEngine, Chinese/Dangi/Islamic, Hindu, DateFormat.
+Next phases: AstronomicalEngine, Chinese/Dangi/Islamic, Hindu, DateFormat.
 
 ## Reference Sources
 

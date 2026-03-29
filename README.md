@@ -4,13 +4,14 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 
 ## Calendar Systems
 
-10 calendar systems and date arithmetic implemented across 4 targets:
+11 calendar systems and date arithmetic implemented across 5 targets:
 
 | Target | What | Notes |
 |--------|------|-------|
 | **CalendarCore** | Protocols and types | `CalendarProtocol`, `Date<C>`, `RataDie`, `Month`, `Weekday`, `YearInfo` |
 | **CalendarSimple** | ISO, Gregorian, Julian, Buddhist, ROC | Gregorian-family arithmetic with era/offset variants |
 | **CalendarComplex** | Hebrew, Coptic, Ethiopian, Persian, Indian | Lunisolar, 13-month, and solar calendars |
+| **CalendarJapanese** | Japanese | Gregorian + era overlay (Meiji→Reiwa), extensible era table |
 | **DateArithmetic** | `DateDuration`, add/until | Temporal-spec algorithms, works with all calendars |
 
 ### Planned
@@ -20,7 +21,6 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 | **AstronomicalEngine** | Moshier + Reingold hybrid engine |
 | **CalendarAstronomical** | Chinese, Dangi, Islamic (Tabular, Umm al-Qura, Observational) |
 | **CalendarHindu** | Lunisolar (Amanta, Purnimanta), Solar (Tamil, Bengali, Odia, Malayalam) |
-| **CalendarJapanese** | Japanese (era data) |
 | **DateFormat** | Semantic skeletons, raw patterns, CLDR data |
 | **DateParse** | Pattern-based parsing |
 | **DateFormatInterval** | Interval and relative formatting |
@@ -107,7 +107,7 @@ targets: [
 
 ## Testing
 
-151 tests across 23 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
+166 tests across 24 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
 
 ```bash
 swift test

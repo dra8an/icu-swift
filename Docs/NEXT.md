@@ -4,34 +4,21 @@
 
 ## Parallelization Opportunity
 
-With Phases 1-3 and 7 complete, three independent workstreams can proceed in parallel:
+With Phases 1-3, 6, and 7 complete, two independent workstreams remain before formatting:
 
 ```
-                                  ┌─ A: CalendarJapanese (Phase 6) ─── small, independent
-                                  │
-Phases 1-3 + 7 (done) ───────────┼─ B: AstronomicalEngine (4a) → CalendarAstronomical (4b) → CalendarHindu (5)
-                                  │
-                                  └─ C: CalendarAll (Phase 8 prep) ─── AnyCalendar, umbrella re-exports
+                                         ┌─ A: AstronomicalEngine (4a) → CalendarAstronomical (4b) → CalendarHindu (5)
+Phases 1-3 + 6 + 7 (done) ──────────────┤
+                                         └─ B: CalendarAll (Phase 8 prep) ─── AnyCalendar, umbrella re-exports
 ```
 
-DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. DateArithmetic (its other dependency) is now done.
+DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. DateArithmetic and CalendarJapanese (its other dependencies) are now done.
 
 ## Recommended Order
 
-### 1. CalendarJapanese (Phase 6) — Medium complexity
+### 1. AstronomicalEngine (Phase 4a) — Large complexity
 
-**Why second:** Small scope, unblocks CalendarAll. Gregorian arithmetic with era overlay — no new math.
-
-**Deliverables:**
-- `Japanese` calendar with `JapaneseEraData` (5 modern eras: Meiji→Reiwa)
-- Era boundary resolution (date → era lookup in sorted table)
-- Future extensibility: `JapaneseEraData` updateable without code changes
-
-**Source:** ICU4X `cal/japanese.rs`.
-
-### 2. AstronomicalEngine (Phase 4a) — Large complexity
-
-**Why third:** Blocks 11 calendars (Chinese, Dangi, Islamic variants, 6 Hindu). Existing Swift code in `hindu-calendar/swift/Sources/HinduCalendar/Ephemeris/` can be adapted.
+**Why first:** Blocks 11 calendars (Chinese, Dangi, Islamic variants, 6 Hindu). Existing Swift code in `hindu-calendar/swift/Sources/HinduCalendar/Ephemeris/` can be adapted.
 
 **Deliverables:**
 - `AstronomicalEngine` protocol: solar/lunar longitude, new moon, sunrise/sunset
@@ -42,7 +29,7 @@ DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. Da
 
 **Source:** Hindu project `Ephemeris/`, ICU4X `calendrical_calculations/src/astronomy.rs`.
 
-### 3. CalendarAstronomical (Phase 4b+c) — Large complexity
+### 2. CalendarAstronomical (Phase 4b+c) — Large complexity
 
 **Depends on:** Phase 4a.
 
@@ -55,7 +42,7 @@ DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. Da
 
 **Source:** ICU4X `cal/east_asian_traditional/`, `cal/hijri/`.
 
-### 4. CalendarHindu (Phase 5) — Large complexity
+### 3. CalendarHindu (Phase 5) — Large complexity
 
 **Depends on:** Phase 4a.
 
@@ -66,7 +53,7 @@ DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. Da
 
 **Source:** `hindu-calendar/swift/` adapted to use `HybridEngine`.
 
-### 5. DateFormat (Phase 8) — Very Large complexity
+### 4. DateFormat (Phase 8) — Very Large complexity
 
 **Depends on:** All calendar phases + Phase 7.
 
@@ -86,7 +73,7 @@ DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. Da
 
 **Source:** ICU4X `fieldsets.rs`, `pattern/`, `format/`. CLDR data.
 
-### 6. DateParse + DateFormatInterval (Phases 9-10)
+### 5. DateParse + DateFormatInterval (Phases 9-10)
 
 **Depends on:** Phase 8.
 
