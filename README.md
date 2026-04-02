@@ -4,7 +4,7 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 
 ## Calendar Systems
 
-11 calendar systems and date arithmetic implemented across 5 targets:
+14 calendar systems implemented across 7 targets:
 
 | Target | What | Notes |
 |--------|------|-------|
@@ -12,14 +12,15 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 | **CalendarSimple** | ISO, Gregorian, Julian, Buddhist, ROC | Gregorian-family arithmetic with era/offset variants |
 | **CalendarComplex** | Hebrew, Coptic, Ethiopian, Persian, Indian | Lunisolar, 13-month, and solar calendars |
 | **CalendarJapanese** | Japanese | Gregorian + era overlay (Meiji→Reiwa), extensible era table |
+| **AstronomicalEngine** | Moshier + Reingold + Hybrid | VSOP87/DE404 (±1″) and Meeus polynomials |
+| **CalendarAstronomical** | Islamic Tabular, Chinese, Dangi | 30-year cycle arithmetic + lunisolar astronomical |
 | **DateArithmetic** | `DateDuration`, add/until | Temporal-spec algorithms, works with all calendars |
 
 ### Planned
 
 | Target | What |
 |--------|------|
-| **AstronomicalEngine** | Moshier + Reingold hybrid engine |
-| **CalendarAstronomical** | Chinese, Dangi, Islamic (Tabular, Umm al-Qura, Observational) |
+| **CalendarAstronomical** | Islamic (Umm al-Qura, Observational) |
 | **CalendarHindu** | Lunisolar (Amanta, Purnimanta), Solar (Tamil, Bengali, Odia, Malayalam) |
 | **DateFormat** | Semantic skeletons, raw patterns, CLDR data |
 | **DateParse** | Pattern-based parsing |
@@ -107,7 +108,7 @@ targets: [
 
 ## Testing
 
-166 tests across 24 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
+237 tests across 39 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
 
 ```bash
 swift test
@@ -120,6 +121,8 @@ Test data includes:
 - Round-trip verification over tens of thousands of dates per calendar
 - Directionality checks ensuring RataDie ordering matches YMD ordering
 - Exhaustive day arithmetic: every day in 2000-2001 tested with multiple offsets
+- Moshier engine validated against real Swiss Ephemeris (JPL DE431) to 0.00001° precision
+- Chinese calendar leap month (M02L) verified against Swiss Ephemeris and ICU4X
 
 ## Sources
 

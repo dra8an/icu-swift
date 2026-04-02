@@ -86,3 +86,8 @@ Algorithms ported from:
 - `Docs/Swift_Implementation_Plan.md` — full 10-phase implementation plan with API sketches
 - `Docs/DateArithmetic.md` — Phase 7 design: Temporal algorithms, API, overflow semantics
 - `Docs/CalendarJapanese.md` — Phase 6 design: era table, Meiji switchover, extensibility
+- `Docs/AstronomicalEngine.md` — Phase 4a: Reingold + Moshier engines, precision validation vs Swiss Ephemeris
+- `Docs/CalendarAstronomical.md` — Phase 4b overview: architecture and links
+- `Docs/IslamicTabular.md` — Islamic Tabular: 30-year cycle, eras, formulas
+- `Docs/Chinese.md` — Chinese calendar: lunisolar algorithm, leap month rule, 2023 bug fix story
+- `Docs/Dangi.md` — Korean Dangi calendar: relationship to Chinese, UTC offset history

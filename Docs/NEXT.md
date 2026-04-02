@@ -1,48 +1,16 @@
 # icu4swift — Next Steps
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-04-01*
 
-## Parallelization Opportunity
+## Current State
 
-With Phases 1-3, 6, and 7 complete, two independent workstreams remain before formatting:
+Phases 1-3, 4a, 4b, 6, and 7 are complete. 14 of 22 calendars implemented. 237 tests passing.
 
-```
-                                         ┌─ A: AstronomicalEngine (4a) → CalendarAstronomical (4b) → CalendarHindu (5)
-Phases 1-3 + 6 + 7 (done) ──────────────┤
-                                         └─ B: CalendarAll (Phase 8 prep) ─── AnyCalendar, umbrella re-exports
-```
-
-DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. DateArithmetic and CalendarJapanese (its other dependencies) are now done.
+Only CalendarHindu (6 calendars) remains before DateFormat can begin. Islamic Umm al-Qura and Observational variants are deferred (require lookup tables or complex crescent visibility criteria).
 
 ## Recommended Order
 
-### 1. AstronomicalEngine (Phase 4a) — Large complexity
-
-**Why first:** Blocks 11 calendars (Chinese, Dangi, Islamic variants, 6 Hindu). Existing Swift code in `hindu-calendar/swift/Sources/HinduCalendar/Ephemeris/` can be adapted.
-
-**Deliverables:**
-- `AstronomicalEngine` protocol: solar/lunar longitude, new moon, sunrise/sunset
-- `MoshierEngine` — port existing Swift code, refactor for thread safety
-- `ReingoldEngine` — port from ICU4X `astronomy.rs` (~2,632 lines)
-- `HybridEngine` — Moshier for 1700-2150, Reingold outside
-- Cross-validation: both engines must agree within tolerances for overlap period
-
-**Source:** Hindu project `Ephemeris/`, ICU4X `calendrical_calculations/src/astronomy.rs`.
-
-### 2. CalendarAstronomical (Phase 4b+c) — Large complexity
-
-**Depends on:** Phase 4a.
-
-**Deliverables:**
-- Chinese calendar (`ChineseTraditional<China>`)
-- Korean calendar (`ChineseTraditional<Korea>`)
-- Islamic Tabular (`Hijri<TabularAlgorithm>`)
-- Islamic Umm al-Qura (`Hijri<UmmAlQura>`)
-- Islamic Observational (`Hijri<Observational>`)
-
-**Source:** ICU4X `cal/east_asian_traditional/`, `cal/hijri/`.
-
-### 3. CalendarHindu (Phase 5) — Large complexity
+### 1. CalendarHindu (Phase 5) — Large complexity
 
 **Depends on:** Phase 4a.
 
@@ -53,7 +21,7 @@ DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. Da
 
 **Source:** `hindu-calendar/swift/` adapted to use `HybridEngine`.
 
-### 4. DateFormat (Phase 8) — Very Large complexity
+### 2. DateFormat (Phase 8) — Very Large complexity
 
 **Depends on:** All calendar phases + Phase 7.
 
@@ -73,7 +41,7 @@ DateFormat (Phase 8) is the bottleneck — it depends on all calendar phases. Da
 
 **Source:** ICU4X `fieldsets.rs`, `pattern/`, `format/`. CLDR data.
 
-### 5. DateParse + DateFormatInterval (Phases 9-10)
+### 3. DateParse + DateFormatInterval (Phases 9-10)
 
 **Depends on:** Phase 8.
 

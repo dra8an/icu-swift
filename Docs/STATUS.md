@@ -1,6 +1,6 @@
 # icu4swift — Project Status
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-04-01*
 
 ## Overall Progress
 
@@ -8,17 +8,17 @@
 Phase 1:  CalendarCore           ████████████████████ DONE
 Phase 2:  CalendarSimple         ████████████████████ DONE
 Phase 3:  CalendarComplex        ████████████████████ DONE
+Phase 4a: AstronomicalEngine     ████████████████████ DONE
+Phase 4b: CalendarAstronomical   ████████████████████ DONE
 Phase 6:  CalendarJapanese       ████████████████████ DONE
 Phase 7:  DateArithmetic         ████████████████████ DONE
-Phase 4a: AstronomicalEngine     ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
-Phase 4b: CalendarAstronomical   ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 5:  CalendarHindu          ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 8:  DateFormat             ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 9:  DateParse              ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 10: DateFormatInterval     ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 ```
 
-**Calendars: 11 of 22 implemented. Arithmetic: done. Formatting: not started.**
+**Calendars: 14 of 22 implemented. Arithmetic: done. Formatting: not started.**
 
 ## What's Done
 
@@ -96,6 +96,34 @@ Dates before Meiji 6 (1873) fall back to `ce`/`bce` eras. `JapaneseEraData` is e
 
 See `Docs/CalendarJapanese.md` for design details.
 
+### Phase 4a: AstronomicalEngine (13 files, 36 tests)
+
+Hybrid astronomical calculation engine with two backends:
+
+| Engine | Algorithm | Precision | Range |
+|--------|-----------|-----------|-------|
+| ReingoldEngine | Meeus polynomials | ~0.13° solar | ±10,000 years |
+| MoshierEngine | VSOP87 + DE404 | ±1 arcsecond solar | ~1700-2150 |
+| HybridEngine | Moshier in modern range, Reingold outside | Best of both | Full range |
+
+Moshier validated against real Swiss Ephemeris (JPL DE431) — agrees to 0.00001°.
+
+See `Docs/AstronomicalEngine.md` for full details.
+
+### Phase 4b: CalendarAstronomical (2 files, 32 tests)
+
+Three calendar systems using the AstronomicalEngine:
+
+| Calendar | Identifier | Type | Algorithm |
+|----------|-----------|------|-----------|
+| Islamic Tabular | `islamic-tbla` | Arithmetic | 30-year cycle, eras `ah`/`bh` |
+| Chinese | `chinese` | Lunisolar | Winter solstice + new moon + major solar terms |
+| Dangi | `dangi` | Lunisolar | Same as Chinese, UTC+9 (Seoul) |
+
+Chinese calendar uses `ChineseYearCache` (LRU) for performance: 39x speedup for consecutive dates.
+
+See `Docs/CalendarAstronomical.md` for full details including the leap month bug fix.
+
 ### Test Coverage
 
 | Suite | Tests | Verified Against |
@@ -117,10 +145,18 @@ See `Docs/CalendarJapanese.md` for design details.
 | Date Difference | 5 | Day/week/year-month diff, round-trip verification |
 | Day Arithmetic | 1 | Exhaustive: every day in 2000-2001 × 5 offsets |
 | Japanese | 15 | ICU4X era boundaries, Meiji 6 switchover, datetime fixtures |
-| **Total** | **166** | |
+| Moment/Reingold | 17 | JD conversion, solar/lunar at J2000, new moon spacing, sunrise |
+| Moshier | 6 | Solar longitude, Delta-T, nutation, lunar, sunrise, new moon |
+| Cross-Validation | 3 | Moshier vs Reingold: solar (<0.05°), new moon (same day), sunrise |
+| HybridEngine | 3 | Modern→Moshier, historical→Reingold, boundary |
+| Chinese Perf | 3 | Single date, 3 dates cached, 30-day cached |
+| Islamic Tabular | 14 | 33 R&D pairs, 30-year cycle, round-trip, eras, directionality |
+| Chinese | 11 | 16 RD conversions, month codes (M02L verified), CNY dates, round-trip |
+| Dangi | 8 | Round-trip, month structure, alignment, conversion |
+| **Total** | **237** | |
 
 ## What's Not Done
 
 See `Docs/NEXT.md` for prioritized next steps.
 
-11 remaining calendar systems + formatting/parsing infrastructure.
+8 remaining calendar systems (6 Hindu + 2 Islamic variants) + formatting/parsing infrastructure.
