@@ -1,4 +1,4 @@
-// Location — a geographic position for astronomical calculations.
+// Location — a geographic position for calendar calculations.
 
 /// A geographic location for sunrise/sunset and observational calendar calculations.
 ///
@@ -22,26 +22,6 @@ public struct Location: Sendable {
     /// Mean time zone offset from longitude (longitude / 360 days).
     public var zoneFromLongitude: Double {
         longitude / 360.0
-    }
-
-    /// Convert local mean time to universal time.
-    public func universalFromLocal(_ localTime: Moment) -> Moment {
-        localTime - zoneFromLongitude
-    }
-
-    /// Convert universal time to local mean time.
-    public func localFromUniversal(_ universalTime: Moment) -> Moment {
-        universalTime + zoneFromLongitude
-    }
-
-    /// Convert standard time to universal time.
-    public func universalFromStandard(_ standardTime: Moment) -> Moment {
-        standardTime - utcOffset
-    }
-
-    /// Convert universal time to standard time.
-    public func standardFromUniversal(_ universalTime: Moment) -> Moment {
-        universalTime + utcOffset
     }
 
     // MARK: - Well-Known Locations

@@ -1,4 +1,5 @@
 // MoshierSunrise — Sunrise/sunset using the Moshier engine.
+import CalendarCore
 //
 // Refactored from Hindu calendar project's Rise.swift.
 // Class → enum with static methods. Delegates solar position to MoshierSolar.

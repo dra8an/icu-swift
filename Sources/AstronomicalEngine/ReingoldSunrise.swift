@@ -1,4 +1,5 @@
 // Reingold sunrise, sunset, and related functions.
+import CalendarCore
 //
 // Ported from ICU4X calendrical_calculations/src/astronomy.rs (Apache-2.0).
 

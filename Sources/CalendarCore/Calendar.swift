@@ -5,7 +5,8 @@
 ///
 /// Calendar types should be lightweight — most are zero-size value types
 /// (e.g., `Gregorian`, `Buddhist`) that exist purely as type-level markers.
-/// Calendars that need runtime data (e.g., `Japanese` with era data) may be larger.
+/// Calendars that need runtime data (e.g., `Japanese` with era data,
+/// Hindu calendars with a location) may be larger.
 public protocol CalendarProtocol: Sendable {
     /// The internal representation of a date in this calendar.
     associatedtype DateInner: Equatable & Comparable & Sendable
@@ -53,4 +54,56 @@ public protocol CalendarProtocol: Sendable {
 
     /// Whether the year containing the given date is a leap year.
     func isInLeapYear(_ date: DateInner) -> Bool
+
+    // MARK: - Location-Dependent Calendars
+
+    /// The geographic location used for astronomical calculations, if this calendar
+    /// is location-dependent (e.g., Hindu calendars that depend on sunrise time).
+    ///
+    /// Returns `nil` for location-independent calendars (the default).
+    var location: Location? { get }
+
+    // MARK: - Non-Bijective Date Mapping
+
+    /// The status of this date on its civil day.
+    ///
+    /// Most calendars have a 1:1 mapping between civil days and calendar dates.
+    /// Hindu lunisolar calendars can have:
+    /// - `.repeated`: this tithi also occurred on the previous civil day (adhika tithi)
+    /// - `.skipped`: this civil day consumed an additional date; see `alternativeDate`
+    func dateStatus(_ date: DateInner) -> DateStatus
+
+    /// An alternative date assigned to the same civil day, if any.
+    ///
+    /// In Hindu lunisolar calendars, a kshaya (skipped) tithi starts and ends
+    /// entirely within one sunrise-to-sunrise period. The civil day has two
+    /// Hindu dates: the primary date (from `fromRataDie`) and the alternative
+    /// (the kshaya tithi that was consumed during that day).
+    ///
+    /// Returns `nil` for most calendars and most dates.
+    func alternativeDate(_ date: DateInner) -> DateInner?
+}
+
+// MARK: - Default Implementations
+
+extension CalendarProtocol {
+    /// Default: no location dependency.
+    public var location: Location? { nil }
+
+    /// Default: normal 1:1 mapping.
+    public func dateStatus(_ date: DateInner) -> DateStatus { .normal }
+
+    /// Default: no alternative date.
+    public func alternativeDate(_ date: DateInner) -> DateInner? { nil }
+}
+
+/// The status of a calendar date on its civil day.
+public enum DateStatus: Sendable {
+    /// Normal 1:1 mapping between civil day and calendar date.
+    case normal
+    /// This date also occurred on the previous civil day (e.g., adhika tithi in Hindu calendar).
+    case repeated
+    /// This civil day consumed an additional date that was skipped (e.g., kshaya tithi).
+    /// Use `alternativeDate` to get the skipped date.
+    case skipped
 }

@@ -100,6 +100,25 @@ public struct Date<C: CalendarProtocol>: Sendable {
         calendar.isInLeapYear(inner)
     }
 
+    // MARK: - Date Status (Non-Bijective Mapping)
+
+    /// The status of this date on its civil day.
+    ///
+    /// Most calendars return `.normal`. Hindu lunisolar calendars may return
+    /// `.repeated` (adhika tithi) or `.skipped` (kshaya tithi).
+    public var dateStatus: DateStatus {
+        calendar.dateStatus(inner)
+    }
+
+    /// An alternative date assigned to the same civil day, if any.
+    ///
+    /// For Hindu lunisolar calendars, a kshaya (skipped) tithi that was consumed
+    /// during this civil day. Returns `nil` for most calendars.
+    public var alternativeDate: Date<C>? {
+        guard let alt = calendar.alternativeDate(inner) else { return nil }
+        return Date(inner: alt, calendar: calendar)
+    }
+
     // MARK: - RataDie Conversion
 
     /// The `RataDie` (fixed day number) for this date.

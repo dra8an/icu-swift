@@ -1,4 +1,5 @@
 // MoshierEngine — AstronomicalEngineProtocol conformance using
+import CalendarCore
 // Moshier VSOP87/DE404 ephemeris.
 //
 // High precision for the modern era (~1700-2150).

@@ -1,4 +1,5 @@
 // AstronomicalEngine protocol — the contract for astronomical calculations.
+import CalendarCore
 
 /// Protocol for astronomical calculation engines.
 ///

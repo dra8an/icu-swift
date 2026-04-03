@@ -1,4 +1,5 @@
 // ReingoldEngine — AstronomicalEngineProtocol conformance using
+import CalendarCore
 // Reingold & Dershowitz / Meeus polynomial approximations.
 //
 // Valid for a very wide date range (±10,000 years).

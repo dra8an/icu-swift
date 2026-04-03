@@ -91,3 +91,4 @@ Algorithms ported from:
 - `Docs/IslamicTabular.md` — Islamic Tabular: 30-year cycle, eras, formulas
 - `Docs/Chinese.md` — Chinese calendar: lunisolar algorithm, leap month rule, 2023 bug fix story
 - `Docs/Dangi.md` — Korean Dangi calendar: relationship to Chinese, UTC offset history
+- `Docs/HinduCalendars.md` — Phase 5 architecture: protocol extensions, kshaya/adhika handling, ayanamsa
