@@ -92,3 +92,4 @@ Algorithms ported from:
 - `Docs/Chinese.md` — Chinese calendar: lunisolar algorithm, leap month rule, 2023 bug fix story
 - `Docs/Dangi.md` — Korean Dangi calendar: relationship to Chinese, UTC offset history
 - `Docs/HinduCalendars.md` — Phase 5 architecture: protocol extensions, kshaya/adhika handling, ayanamsa
+- `Docs/PERFORMANCE.md` — Benchmarks, lazy field computation pattern, caching strategies, optimization opportunities

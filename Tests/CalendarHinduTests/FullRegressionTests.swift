@@ -68,7 +68,7 @@ private func runSolarCsvTest<V: HinduSolarVariant>(
 @Suite("Full Regression")
 struct FullRegressionTests {
 
-    @Test("Lunisolar CSV: sampled 1,100+ days from 1900-2050")
+    @Test("Lunisolar CSV: all 55,152 days from 1900-2050")
     func lunisolarCsvRegression() throws {
         guard FileManager.default.fileExists(atPath: lunisolarCsvPath) else {
             print("SKIP: lunisolar CSV not found"); return
@@ -78,7 +78,7 @@ struct FullRegressionTests {
         let content = try String(contentsOfFile: lunisolarCsvPath, encoding: .utf8)
         let lines = content.components(separatedBy: .newlines)
 
-        let sampleStep = 50
+        let sampleStep = 1  // Test every single day (55,152 days)
         var sampled = 0
         var failures = 0
 
@@ -115,7 +115,7 @@ struct FullRegressionTests {
         }
 
         print("Lunisolar CSV: \(sampled) days sampled, \(failures) assertion failures")
-        #expect(sampled > 1000, "Should sample >1000 days, got \(sampled)")
+        #expect(sampled > 55000, "Should test >55000 days, got \(sampled)")
         #expect(failures == 0, "Expected 0 failures, got \(failures)")
     }
 
