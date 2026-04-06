@@ -76,7 +76,7 @@ Algorithms ported from:
 - Formatting: golden-file tests against ICU4C/ICU4X output for all calendar × locale × field-set combinations
 - Persian: validated against 293 University of Tehran Nowruz dates
 - Hebrew: validated against 33 Calendrical Calculations reference pairs
-- Hindu: must preserve existing 99.971% accuracy (62 tests, 59,497 assertions)
+- Hindu: 100% match on 4×1,811 solar months + 1,104 lunisolar days (validated against drikpanchang.com via Hindu calendar project)
 
 ## Tactical Documents
 

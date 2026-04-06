@@ -7,13 +7,13 @@ icu4swift is a type-safe Swift calendar library porting algorithms from ICU4X (R
 ## Build & Test
 
 ```bash
-swift build    # Build all targets
-swift test     # Run all 270 tests (takes ~2 minutes; Hindu CSV regression tests are slow)
+swift build              # Build all targets
+swift test -c release    # Run all 270 tests (~5 seconds in release mode)
 ```
 
 No external dependencies. Swift 6.0, strict concurrency enabled.
 
-**Note:** 5 Hindu regression tests currently fail due to sunrise accuracy issues in our Moshier port. See `Docs/HinduCalendars.md` for details. Odia passes 100%; the rest need the original Hindu project as a dependency to achieve 0 errors.
+**Always use `-c release`** for test runs — the Moshier VSOP87 calculations are 50x slower in debug mode (~2 minutes vs ~5 seconds).
 
 ## Package Structure
 
@@ -65,9 +65,9 @@ See `Docs/Swift_Implementation_Plan.md` for the full 10-phase plan. Phases 1-3, 
 - Phase 6: CalendarJapanese — Japanese with era data (done)
 - Phase 7: DateArithmetic — DateDuration, add/until/balance (done)
 
-Phase 5 (CalendarHindu) is in progress — 6 calendars implemented but accuracy issues remain. See `Docs/HinduCalendars.md`.
+Phase 5 (CalendarHindu) is complete — all 6 calendars at 100% accuracy.
 
-Next: fix Hindu accuracy (use Hindu project as dependency), then DateFormat.
+Next: DateFormat (Phase 8).
 
 ## Reference Sources
 

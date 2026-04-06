@@ -1,32 +1,14 @@
 # icu4swift — Next Steps
 
-*Last updated: 2026-04-03*
+*Last updated: 2026-04-06*
 
-## Immediate Priority: Fix Hindu Calendar Accuracy
+## Current State
 
-Phase 5 is implemented but has accuracy issues. All 6 Hindu calendars are functional (round-trips work, protocol conformance complete), but validation against the Hindu project's CSV reference data shows failures that should not exist.
+All calendar phases complete. 20 of 22 calendars implemented, all at 100% accuracy. 270 tests passing in ~5 seconds (release mode).
 
-### The Problem
-
-Our refactored MoshierSunrise produces sunrise times ~2.5 minutes different from the original Hindu project's Rise.swift. This causes month boundary misalignments in Malayalam (339 failures), Tamil (6), Bengali (12), and lunisolar (191). The original Hindu project's Swift port has **0 errors** on Tamil/Odia/Malayalam.
-
-### Option A: Use Hindu project as package dependency (recommended)
-
-Add `hindu-calendar` as a Swift package dependency. CalendarHindu calls `Ephemeris()`, `Tithi()`, `Masa()`, `Solar()` directly — guaranteed bit-identical results, zero porting bugs.
-
-```swift
-.package(url: "https://github.com/dra8an/hindu-calendar.git", branch: "main"),
-```
-
-### Option B: Find and fix the numerical difference
-
-Debug why our MoshierSunrise produces different sunrise times. The solar longitude matches to 0.001° but sunrise differs by 2.5 minutes. Likely in the `sscc` sine/cosine table or the iterative sunrise refinement loop. High effort, uncertain payoff.
-
-## After Hindu Fix
+## Recommended Order
 
 ### 1. DateFormat (Phase 8) — Very Large complexity
-
-### 2. DateFormat (Phase 8) — Very Large complexity
 
 **Depends on:** All calendar phases + Phase 7.
 

@@ -1,6 +1,6 @@
 # Hindu Calendars — Phase 5
 
-*Planning: 2026-04-02 | Status: In Progress*
+*Completed: 2026-04-06 | Status: Done — 100% accuracy on all calendars*
 
 ## Overview
 
@@ -227,38 +227,29 @@ The Hindu project's Swift port achieves:
 - **Malayalam**: 0 failures / 1,811 months (100%)
 - **Lunisolar**: ~15-20 irreducible boundary failures / 55,152 days (99.971%)
 
-### Current State (our implementation)
+### Final Results (our implementation)
 
-| Calendar | Failures | Total | Match Rate | Target |
-|----------|--------:|------:|-----------:|--------|
-| Odia | **0** | 1,811 | **100%** | ✓ |
-| Tamil | 6 | 1,811 | 99.67% | Should be 0 |
-| Bengali | 12 | 1,811 | 99.34% | Should be 0 |
-| Malayalam | 339 | 1,811 | 81.3% | Should be 0 |
-| Lunisolar | 191 | 1,104 | 82.7% | Should be ~15 |
+| Calendar | Failures | Total | Match Rate |
+|----------|--------:|------:|-----------:|
+| Tamil | **0** | 1,811 | **100%** |
+| Bengali | **0** | 1,811 | **100%** |
+| Odia | **0** | 1,811 | **100%** |
+| Malayalam | **0** | 1,811 | **100%** |
+| Lunisolar | **0** | 1,104 | **100%** |
 
 ### Bugs Found and Fixed
 
-1. **utcOffset unit mismatch** (fixed 2026-04-03): Bengali and Odia critical time formulas divided `Location.utcOffset` (already in fractional days) by 24 again. The Hindu project uses hours; our `Location` uses fractional days. Fixed Bengali from 1,025→12 failures, Odia from 1,019→0.
+1. **utcOffset unit mismatch** (fixed 2026-04-03): Bengali and Odia critical time formulas divided `Location.utcOffset` (already in fractional days) by 24 again. The Hindu project uses hours; our `Location` uses fractional days. Fixed Bengali from 1,025→0, Odia from 1,019→0.
 
-2. **JulianDayHelper epoch** (fixed 2026-04-03): `ymdToJd` returned RD+0.5 instead of real Julian Day (should add 1721424.5, not 0.5). This caused the Saka year calculation to be off by ~4,700 years. Fixed by adding the correct JD offset.
+2. **JulianDayHelper epoch** (fixed 2026-04-03): `ymdToJd` returned RD+0.5 instead of real Julian Day (should add 1721424.5, not 0.5). This caused the Saka year calculation to be off by ~4,700 years.
 
-### Root Cause of Remaining Failures
+3. **Missing UTC offset in sunrise/sunset calls** (fixed 2026-04-06): The Hindu project's `Ephemeris.sunriseJd` subtracts `utcOffset/24` (hours→days) before calling `Rise.sunrise`. Our code was calling `MoshierSunrise.sunrise` without this adjustment. Fixed Malayalam from 339→0, lunisolar from 191→0.
 
-Our refactored MoshierSunrise (ported from the Hindu project's `Rise.swift` by converting mutable class arrays to local variables) produces sunrise times ~2.5 minutes different from the original. Cross-check:
+4. **Horizon dip correction removed** (fixed 2026-04-06): The formula `h0 -= 0.0353 * sqrt(alt)` assumes an ocean-visible horizon, which is inappropriate for inland cities on flat terrain. The Hindu project removed this correction and updated `Location.newDelhi` to use the correct elevation (216.0m). Our code now matches. Fixed Tamil from 6→0, Bengali from 12→0.
 
-| Quantity | Our port | Hindu project | Difference |
-|----------|------:|------:|------:|
-| Sunrise JD (Jan 15, 2024) | 2460324.5711 | 2460324.5728 | 2.5 min |
-| Solar longitude | 270.452° | 270.452° | <0.001° |
+### Key Insight
 
-Solar longitude matches perfectly — the issue is isolated to the sunrise calculation. The 2.5-minute shift is enough to move month boundaries for Malayalam (which depends on sunrise + sunset for its critical time) and lunisolar (which depends on sunrise for tithi determination).
-
-### Proposed Fix
-
-**Option A (recommended):** Add the Hindu project (`hindu-calendar`) as a Swift package dependency. CalendarHindu calls the original `Ephemeris`, `Tithi`, `Masa`, `Solar` classes directly. Guarantees bit-identical results — zero porting bugs.
-
-**Option B:** Debug the numerical difference between our `MoshierSunrise` and the original `Rise.swift`. The `sscc` sine/cosine recurrence or the iterative sunrise refinement likely diverged during the class→enum refactoring. High effort, uncertain payoff since the original code already exists in Swift.
+The Moshier port (class→enum refactoring with local variables) was **bit-identical** to the original all along. All four bugs were in how we called the engine — wrong units, missing offsets, wrong altitude, wrong dip formula — not in the engine itself. The solar longitude, RA, declination, nutation, and obliquity matched perfectly at every test point.
 
 ## Source
 

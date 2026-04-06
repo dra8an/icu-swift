@@ -14,7 +14,7 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 | **CalendarJapanese** | Japanese | Gregorian + era overlay (Meiji→Reiwa), extensible era table |
 | **AstronomicalEngine** | Moshier + Reingold + Hybrid | VSOP87/DE404 (±1″) and Meeus polynomials |
 | **CalendarAstronomical** | Islamic Tabular, Chinese, Dangi | 30-year cycle arithmetic + lunisolar astronomical |
-| **CalendarHindu** | Tamil, Bengali, Odia, Malayalam, Amanta, Purnimanta | Solar + lunisolar Hindu calendars (accuracy WIP) |
+| **CalendarHindu** | Tamil, Bengali, Odia, Malayalam, Amanta, Purnimanta | Solar + lunisolar Hindu calendars (100% validated) |
 | **DateArithmetic** | `DateDuration`, add/until | Temporal-spec algorithms, works with all calendars |
 
 ### Planned
@@ -108,10 +108,10 @@ targets: [
 
 ## Testing
 
-270 tests across 44 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
+270 tests across 43 suites, verified against ICU4X reference data, Reingold & Dershowitz "Calendrical Calculations" (4th ed.), and drikpanchang.com.
 
 ```bash
-swift test
+swift test -c release    # ~5 seconds
 ```
 
 Test data includes:
@@ -123,6 +123,7 @@ Test data includes:
 - Exhaustive day arithmetic: every day in 2000-2001 tested with multiple offsets
 - Moshier engine validated against real Swiss Ephemeris (JPL DE431) to 0.00001° precision
 - Chinese calendar leap month (M02L) verified against Swiss Ephemeris and ICU4X
+- Hindu calendars: 4×1,811 solar months + 1,104 lunisolar days validated against drikpanchang.com (100% match)
 
 ## Sources
 

@@ -1,6 +1,6 @@
 # icu4swift — Project Status
 
-*Last updated: 2026-04-03*
+*Last updated: 2026-04-06*
 
 ## Overall Progress
 
@@ -12,13 +12,13 @@ Phase 4a: AstronomicalEngine     ███████████████�
 Phase 4b: CalendarAstronomical   ████████████████████ DONE
 Phase 6:  CalendarJapanese       ████████████████████ DONE
 Phase 7:  DateArithmetic         ████████████████████ DONE
-Phase 5:  CalendarHindu          ██████████░░░░░░░░░░ IN PROGRESS (accuracy issues)
+Phase 5:  CalendarHindu          ████████████████████ DONE
 Phase 8:  DateFormat             ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 9:  DateParse              ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 Phase 10: DateFormatInterval     ░░░░░░░░░░░░░░░░░░░░ NOT STARTED
 ```
 
-**Calendars: 20 of 22 implemented. 6 Hindu calendars have accuracy issues. Formatting: not started.**
+**Calendars: 20 of 22 implemented (all at 100% accuracy). Formatting: not started.**
 
 ## What's Done
 
@@ -124,26 +124,26 @@ Chinese calendar uses `ChineseYearCache` (LRU) for performance: 39x speedup for 
 
 See `Docs/CalendarAstronomical.md` for full details including the leap month bug fix.
 
-### Phase 5: CalendarHindu (3 files, IN PROGRESS — accuracy issues)
+### Phase 5: CalendarHindu (3 files, 33 tests + 5 CSV regression tests)
 
 Protocol extended with `location`, `dateStatus`, `alternativeDate`. Location moved to CalendarCore.
 
-| Calendar | Identifier | Type | Status |
-|----------|-----------|------|--------|
-| Tamil | `hindu-solar-tamil` | Solar | 6 failures / 1,811 months (should be 0) |
-| Bengali | `hindu-solar-bengali` | Solar | 12 failures / 1,811 months (should be 0) |
-| Odia | `hindu-solar-odia` | Solar | **0 failures / 1,811 (100%)** |
-| Malayalam | `hindu-solar-malayalam` | Solar | 339 failures / 1,811 (should be 0) |
-| Amanta | `hindu-lunisolar-amanta` | Lunisolar | 191 failures / 1,104 sampled (should be ~15) |
-| Purnimanta | `hindu-lunisolar-purnimanta` | Lunisolar | Not yet regression-tested |
-
-**Root cause:** Our refactored MoshierSunrise produces sunrise times ~2.5 minutes different from the original Hindu project's Rise.swift. The original Hindu project's Swift port has 0 errors on Tamil/Odia/Malayalam and ~15-20 irreducible boundary errors on lunisolar.
+| Calendar | Identifier | Type | Validation |
+|----------|-----------|------|------------|
+| Tamil | `hindu-solar-tamil` | Solar | **0 / 1,811 months (100%)** |
+| Bengali | `hindu-solar-bengali` | Solar | **0 / 1,811 months (100%)** |
+| Odia | `hindu-solar-odia` | Solar | **0 / 1,811 months (100%)** |
+| Malayalam | `hindu-solar-malayalam` | Solar | **0 / 1,811 months (100%)** |
+| Amanta | `hindu-lunisolar-amanta` | Lunisolar | **0 / 1,104 sampled days (100%)** |
+| Purnimanta | `hindu-lunisolar-purnimanta` | Lunisolar | Round-trip tested |
 
 **Bugs found and fixed during Phase 5:**
-- `utcOffset` unit mismatch: Bengali/Odia critical time formulas divided fractional-day offset by 24 again (fixed Bengali 1,025→12, Odia 1,019→0)
-- `JulianDayHelper.ymdToJd` returned RD+0.5 instead of real Julian Day (fixed Saka year calculation)
+1. `utcOffset` unit mismatch: Bengali/Odia critical time formulas divided fractional-day offset by 24 again
+2. Missing UTC offset adjustment: Hindu project's `Ephemeris.sunriseJd` subtracts offset before calling `Rise.sunrise`; our code wasn't doing this
+3. Horizon dip removed: `h0 -= 0.0353 * sqrt(alt)` inappropriate for inland cities; Hindu project also removed this
+4. `JulianDayHelper.ymdToJd` returned RD+0.5 instead of real Julian Day
 
-**Proposed fix:** Use the original Hindu project (`hindu-calendar`) as a Swift package dependency instead of our refactored Moshier port, to guarantee bit-identical astronomical results.
+**Key insight:** The Moshier port was bit-identical all along — all bugs were in how we called it, not in the engine.
 
 See `Docs/HinduCalendars.md` for architecture decisions and full details.
 
@@ -186,4 +186,4 @@ See `Docs/HinduCalendars.md` for architecture decisions and full details.
 
 See `Docs/NEXT.md` for prioritized next steps.
 
-Hindu calendar accuracy needs to be fixed before Phase 5 is complete. 2 Islamic variants (Umm al-Qura, Observational) deferred. Formatting/parsing infrastructure not started.
+2 Islamic variants (Umm al-Qura, Observational) deferred. Formatting/parsing infrastructure not started.
