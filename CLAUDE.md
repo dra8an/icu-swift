@@ -8,10 +8,12 @@ icu4swift is a type-safe Swift calendar library porting algorithms from ICU4X (R
 
 ```bash
 swift build    # Build all targets
-swift test     # Run all 237 tests (takes ~8 seconds)
+swift test     # Run all 270 tests (takes ~2 minutes; Hindu CSV regression tests are slow)
 ```
 
 No external dependencies. Swift 6.0, strict concurrency enabled.
+
+**Note:** 5 Hindu regression tests currently fail due to sunrise accuracy issues in our Moshier port. See `Docs/HinduCalendars.md` for details. Odia passes 100%; the rest need the original Hindu project as a dependency to achieve 0 errors.
 
 ## Package Structure
 
@@ -23,6 +25,7 @@ Sources/
   CalendarJapanese/      # Japanese calendar with era data (Meiji→Reiwa)
   AstronomicalEngine/    # Reingold + Moshier + HybridEngine, Moment, Location
   CalendarAstronomical/  # Islamic Tabular, Chinese, Dangi + year cache
+  CalendarHindu/         # Tamil, Bengali, Odia, Malayalam (solar) + Amanta, Purnimanta (lunisolar) + Ayanamsa
   DateArithmetic/        # DateDuration, Date.added(), Date.until(), balance algorithm
 Tests/
   CalendarCoreTests/     # 26 tests for core types
@@ -31,6 +34,7 @@ Tests/
   CalendarJapaneseTests/ # 15 tests for Japanese calendar
   AstronomicalEngineTests/ # 36 tests for Reingold, Moshier, cross-validation
   CalendarAstronomicalTests/ # 35 tests for Islamic, Chinese, Dangi + perf
+  CalendarHinduTests/    # 33 tests: ayanamsa, solar, lunisolar, CSV regression
   DateArithmeticTests/   # 24 tests for date arithmetic
 Docs/                    # Architecture analysis and implementation plan
 ```
@@ -61,7 +65,9 @@ See `Docs/Swift_Implementation_Plan.md` for the full 10-phase plan. Phases 1-3, 
 - Phase 6: CalendarJapanese — Japanese with era data (done)
 - Phase 7: DateArithmetic — DateDuration, add/until/balance (done)
 
-Next phases: CalendarHindu, DateFormat.
+Phase 5 (CalendarHindu) is in progress — 6 calendars implemented but accuracy issues remain. See `Docs/HinduCalendars.md`.
+
+Next: fix Hindu accuracy (use Hindu project as dependency), then DateFormat.
 
 ## Reference Sources
 

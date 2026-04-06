@@ -28,6 +28,26 @@ public protocol HinduSolarVariant: Sendable {
     static var eraName: String { get }
     /// Compute the critical time (JD UT) for evaluating rashi on a given civil day.
     static func criticalTimeJd(_ jdMidnightUt: Double, _ loc: Location, engine: MoshierEngine) -> Double
+
+    /// Bengali per-rashi tuning: adjust critical time for specific rashis.
+    static func tunedCriticalTime(_ baseCritJd: Double, _ rashi: Int) -> Double
+
+    /// Bengali day edge offset: shift the day boundary for specific rashis.
+    static func dayEdgeOffset(_ rashi: Int) -> Double
+
+    /// Bengali rashi correction: correct rashi near boundaries using tuned critical time.
+    static func rashiCorrection(_ jdCrit: Double, _ rashi: inout Int, _ lon: inout Double)
+
+    /// Bengali tithi push: use tithi boundary to decide if the next day should be used.
+    static func tithiPushNext(_ jdSankranti: Double, _ jdDay: Double, _ rashi: Int, _ loc: Location) -> Bool
+}
+
+// Default implementations — no adjustments for non-Bengali calendars
+extension HinduSolarVariant {
+    public static func tunedCriticalTime(_ baseCritJd: Double, _ rashi: Int) -> Double { baseCritJd }
+    public static func dayEdgeOffset(_ rashi: Int) -> Double { 0.0 }
+    public static func rashiCorrection(_ jdCrit: Double, _ rashi: inout Int, _ lon: inout Double) { }
+    public static func tithiPushNext(_ jdSankranti: Double, _ jdDay: Double, _ rashi: Int, _ loc: Location) -> Bool { false }
 }
 
 // MARK: - Tamil
@@ -42,9 +62,10 @@ public enum Tamil: HinduSolarVariant {
 
     public static func criticalTimeJd(_ jdMidnightUt: Double, _ loc: Location, engine: MoshierEngine) -> Double {
         // Sunset − 9.5 minutes
-        let moment = Moment.fromJulianDay(jdMidnightUt)
-        if let sunset = engine.sunset(at: moment, location: loc) {
-            return sunset.toJulianDay() - 9.5 / (24.0 * 60.0)
+        // Hindu project adjusts for UTC offset before calling Rise.sunset
+        let ss = MoshierSunrise.sunset(jdMidnightUt - loc.utcOffset, loc.longitude, loc.latitude, loc.elevation)
+        if ss > 0 {
+            return ss - 9.5 / (24.0 * 60.0)
         }
         return jdMidnightUt + 18.0 / 24.0 - 9.5 / (24.0 * 60.0)
     }
@@ -61,8 +82,81 @@ public enum Bengali: HinduSolarVariant {
     public static let eraName = "bangabda"
 
     public static func criticalTimeJd(_ jdMidnightUt: Double, _ loc: Location, engine: MoshierEngine) -> Double {
-        // Midnight IST + 24 minutes = 00:24 IST = 18:54 UT previous day
-        jdMidnightUt - loc.utcOffset / 24.0 + 24.0 / (24.0 * 60.0)
+        // Midnight IST + 24 minutes = 00:24 IST
+        // loc.utcOffset is already in fractional days, not hours
+        jdMidnightUt - loc.utcOffset + 24.0 / (24.0 * 60.0)
+    }
+
+    // Per-rashi tuning: adjust critical time for Karkata (+8 min) and Tula (-1 min)
+    public static func tunedCriticalTime(_ baseCritJd: Double, _ rashi: Int) -> Double {
+        let adjustMin: Double
+        switch rashi {
+        case 4:  adjustMin = 8.0     // Karkata
+        case 7:  adjustMin = -1.0    // Tula
+        default: adjustMin = 0.0
+        }
+        return baseCritJd + adjustMin / (24.0 * 60.0)
+    }
+
+    // Day edge offset: shift day boundary for Kanya, Tula, Dhanu
+    public static func dayEdgeOffset(_ rashi: Int) -> Double {
+        switch rashi {
+        case 6:  return 4.0 / (24.0 * 60.0)    // Kanya: 23:56
+        case 7:  return 21.0 / (24.0 * 60.0)   // Tula: 23:39
+        case 9:  return 11.0 / (24.0 * 60.0)   // Dhanu: 23:49
+        default: return 0.0
+        }
+    }
+
+    // Rashi correction: check if the next rashi should be used at the tuned critical time
+    public static func rashiCorrection(_ jdCrit: Double, _ rashi: inout Int, _ lon: inout Double) {
+        let nextR = (rashi % 12) + 1
+        let tuned = tunedCriticalTime(jdCrit, nextR)
+        if tuned > jdCrit {
+            let lon2 = HinduAyanamsa.siderealSolarLongitude(tuned)
+            var r2 = Int(floor(lon2 / 30.0)) + 1
+            if r2 > 12 { r2 = 12 }
+            if r2 == nextR {
+                rashi = nextR
+                lon = lon2
+            }
+        }
+    }
+
+    // Tithi push: use tithi boundary to decide next-day assignment
+    public static func tithiPushNext(_ jdSankranti: Double, _ jdDay: Double, _ rashi: Int, _ loc: Location) -> Bool {
+        if rashi == 4 { return false }   // Karkata: always this day
+        if rashi == 10 { return true }   // Makara: always next day
+
+        // Check if tithi boundary of previous day falls before or after sankranti
+        let prevYmd = JulianDayHelper.jdToYmd(jdDay - 1.0)
+        let prevJd = JulianDayHelper.ymdToJd(year: prevYmd.0, month: prevYmd.1, day: prevYmd.2)
+        let jdPrevRise = MoshierSunrise.sunrise(
+            prevJd - loc.utcOffset,
+            loc.longitude, loc.latitude, loc.elevation
+        )
+        guard jdPrevRise > 0 else { return false }
+
+        // Find the tithi at sunrise of previous day, then find when that tithi ends
+        let phase = LunisolarArithmetic.lunarPhase(jdPrevRise)
+        let t = min(Int(phase / 12.0) + 1, 30)
+        let nextTithi = (t % 30) + 1
+        let targetPhase = Double(nextTithi - 1) * 12.0
+
+        // Find tithi boundary (when the next tithi starts)
+        var lo = jdPrevRise
+        var hi = jdPrevRise + 2.0
+        for _ in 0..<50 {
+            let mid = (lo + hi) / 2.0
+            let p = LunisolarArithmetic.lunarPhase(mid)
+            var diff = p - targetPhase
+            if diff > 180.0 { diff -= 360.0 }
+            if diff < -180.0 { diff += 360.0 }
+            if diff >= 0 { hi = mid } else { lo = mid }
+        }
+        let jdTithiEnd = (lo + hi) / 2.0
+
+        return jdTithiEnd <= jdSankranti
     }
 }
 
@@ -78,7 +172,8 @@ public enum Odia: HinduSolarVariant {
 
     public static func criticalTimeJd(_ jdMidnightUt: Double, _ loc: Location, engine: MoshierEngine) -> Double {
         // Fixed 22:12 IST = 16:42 UT
-        jdMidnightUt + (22.2 - loc.utcOffset) / 24.0
+        // 22.2 hours = 22h 12m; convert to days then subtract UTC offset (already in days)
+        jdMidnightUt + 22.2 / 24.0 - loc.utcOffset
     }
 }
 
@@ -95,10 +190,12 @@ public enum Malayalam: HinduSolarVariant {
     public static func criticalTimeJd(_ jdMidnightUt: Double, _ loc: Location, engine: MoshierEngine) -> Double {
         // End of madhyahna − 9.5 minutes
         // madhyahna end = sunrise + 0.6 × (sunset − sunrise)
-        let moment = Moment.fromJulianDay(jdMidnightUt)
-        if let sr = engine.sunrise(at: moment, location: loc),
-           let ss = engine.sunset(at: moment, location: loc) {
-            let madhyahnaEnd = sr.toJulianDay() + 0.6 * (ss.toJulianDay() - sr.toJulianDay())
+        // Hindu project adjusts for UTC offset before calling Rise.sunrise/sunset
+        let adjustedJd = jdMidnightUt - loc.utcOffset
+        let sr = MoshierSunrise.sunrise(adjustedJd, loc.longitude, loc.latitude, loc.elevation)
+        let ss = MoshierSunrise.sunset(adjustedJd, loc.longitude, loc.latitude, loc.elevation)
+        if sr > 0 && ss > 0 {
+            let madhyahnaEnd = sr + 0.6 * (ss - sr)
             return madhyahnaEnd - 9.5 / (24.0 * 60.0)
         }
         return jdMidnightUt + 14.0 / 24.0 - 9.5 / (24.0 * 60.0)
@@ -266,10 +363,13 @@ enum HinduSolarArithmetic {
         let jdMidnight = floor(jd - 0.5) + 0.5
         let jdCrit = V.criticalTimeJd(jdMidnight, loc, engine: engine)
 
-        let lon = HinduAyanamsa.siderealSolarLongitude(jdCrit)
+        var lon = HinduAyanamsa.siderealSolarLongitude(jdCrit)
         var rashi = Int(floor(lon / 30.0)) + 1
         if rashi > 12 { rashi = 12 }
         if rashi < 1 { rashi = 1 }
+
+        // Bengali rashi correction near boundaries
+        V.rashiCorrection(jdCrit, &rashi, &lon)
 
         let target = Double(rashi - 1) * 30.0
         var degreesPast = lon - target
@@ -336,16 +436,23 @@ enum HinduSolarArithmetic {
     }
 
     /// Convert sankranti JD to the civil day it applies to.
+    /// Includes Bengali per-rashi day edge offset, tuned critical time, and tithi push.
     private static func sankrantiToCivilDay<V: HinduSolarVariant>(
         _ jdSankranti: Double, _ loc: Location, _ variant: V.Type, _ rashi: Int, engine: MoshierEngine
     ) -> (Int, Int, Int) {
-        let localJd = jdSankranti + loc.utcOffset / 24.0 + 0.5
+        let dayEdge = V.dayEdgeOffset(rashi)
+        // loc.utcOffset is already in fractional days
+        let localJd = jdSankranti + loc.utcOffset + 0.5 + dayEdge
         let ymd = JulianDayHelper.jdToYmd(floor(localJd))
 
         let jdDay = JulianDayHelper.ymdToJd(year: ymd.0, month: ymd.1, day: ymd.2)
-        let crit = V.criticalTimeJd(jdDay, loc, engine: engine)
+        var crit = V.criticalTimeJd(jdDay, loc, engine: engine)
+        crit = V.tunedCriticalTime(crit, rashi)
 
         if jdSankranti <= crit {
+            if V.tithiPushNext(jdSankranti, jdDay, rashi, loc) {
+                return JulianDayHelper.jdToYmd(jdDay + 1.0)
+            }
             return ymd
         } else {
             return JulianDayHelper.jdToYmd(jdDay + 1.0)

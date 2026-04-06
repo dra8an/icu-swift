@@ -218,10 +218,11 @@ enum LunisolarArithmetic {
     /// Sunrise JD (UT) for a given JD at the given location.
     /// Falls back to approximate local noon minus half-day if no rise.
     static func sunriseJd(_ jd: Double, _ loc: Location) -> Double {
-        let result = MoshierSunrise.sunrise(jd, loc.longitude, loc.latitude, loc.elevation)
+        // The Hindu project's Ephemeris.sunriseJd adjusts for UTC offset before calling Rise.sunrise
+        let result = MoshierSunrise.sunrise(jd - loc.utcOffset, loc.longitude, loc.latitude, loc.elevation)
         if result > 0 { return result }
         // Fallback: approximate sunrise at 6 AM local time
-        return jd + 0.5 - loc.utcOffset / 24.0
+        return jd + 0.5 - loc.utcOffset
     }
 
     // MARK: - New moon / full moon finding (inverse Lagrange interpolation)

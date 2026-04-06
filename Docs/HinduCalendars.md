@@ -218,17 +218,52 @@ public struct HinduLunisolar<V: LunisolarVariant>: CalendarProtocol {
 
 ## Validation
 
-The Hindu calendar project has extensive validation data:
-- **55,152 lunisolar days** (1900-2050) validated against drikpanchang.com: 99.971% match
-- **7,244 solar month boundaries** across 4 calendars: 100% match
-- **186 drikpanchang.com dates**: 100% match
-- **16 remaining mismatches**: all are sub-minute tithi boundary edge cases
+### Target (from Hindu project's Swift port)
 
-Our implementation must reproduce these results exactly. The Moshier engine is already validated (Phase 4a) — the remaining work is in the calendar logic layer.
+The Hindu project's Swift port achieves:
+- **Tamil**: 0 failures / 1,811 months (100%)
+- **Bengali**: 0 or very few failures / 1,811 months
+- **Odia**: 0 failures / 1,811 months (100%)
+- **Malayalam**: 0 failures / 1,811 months (100%)
+- **Lunisolar**: ~15-20 irreducible boundary failures / 55,152 days (99.971%)
+
+### Current State (our implementation)
+
+| Calendar | Failures | Total | Match Rate | Target |
+|----------|--------:|------:|-----------:|--------|
+| Odia | **0** | 1,811 | **100%** | ✓ |
+| Tamil | 6 | 1,811 | 99.67% | Should be 0 |
+| Bengali | 12 | 1,811 | 99.34% | Should be 0 |
+| Malayalam | 339 | 1,811 | 81.3% | Should be 0 |
+| Lunisolar | 191 | 1,104 | 82.7% | Should be ~15 |
+
+### Bugs Found and Fixed
+
+1. **utcOffset unit mismatch** (fixed 2026-04-03): Bengali and Odia critical time formulas divided `Location.utcOffset` (already in fractional days) by 24 again. The Hindu project uses hours; our `Location` uses fractional days. Fixed Bengali from 1,025→12 failures, Odia from 1,019→0.
+
+2. **JulianDayHelper epoch** (fixed 2026-04-03): `ymdToJd` returned RD+0.5 instead of real Julian Day (should add 1721424.5, not 0.5). This caused the Saka year calculation to be off by ~4,700 years. Fixed by adding the correct JD offset.
+
+### Root Cause of Remaining Failures
+
+Our refactored MoshierSunrise (ported from the Hindu project's `Rise.swift` by converting mutable class arrays to local variables) produces sunrise times ~2.5 minutes different from the original. Cross-check:
+
+| Quantity | Our port | Hindu project | Difference |
+|----------|------:|------:|------:|
+| Sunrise JD (Jan 15, 2024) | 2460324.5711 | 2460324.5728 | 2.5 min |
+| Solar longitude | 270.452° | 270.452° | <0.001° |
+
+Solar longitude matches perfectly — the issue is isolated to the sunrise calculation. The 2.5-minute shift is enough to move month boundaries for Malayalam (which depends on sunrise + sunset for its critical time) and lunisolar (which depends on sunrise for tithi determination).
+
+### Proposed Fix
+
+**Option A (recommended):** Add the Hindu project (`hindu-calendar`) as a Swift package dependency. CalendarHindu calls the original `Ephemeris`, `Tithi`, `Masa`, `Solar` classes directly. Guarantees bit-identical results — zero porting bugs.
+
+**Option B:** Debug the numerical difference between our `MoshierSunrise` and the original `Rise.swift`. The `sscc` sine/cosine recurrence or the iterative sunrise refinement likely diverged during the class→enum refactoring. High effort, uncertain payoff since the original code already exists in Swift.
 
 ## Source
 
-- **Hindu calendar project** `swift/Sources/HinduCalendar/` — validated Swift implementation
+- **Hindu calendar project** `swift/Sources/HinduCalendar/` — validated Swift implementation (0 errors on solar, ~15 on lunisolar)
 - **Hindu calendar project** `Docs/` — extensive validation reports, physics documentation
+- **Hindu calendar project** `validation/moshier/` — CSV reference data (55K lunisolar + 4×1,811 solar months)
 - **ICU4X** does not implement Hindu calendars (only Indian National/Saka, which we already have in Phase 3)
 - **Drikpanchang.com** — authoritative Hindu calendar reference for validation

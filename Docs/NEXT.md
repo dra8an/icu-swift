@@ -1,25 +1,30 @@
 # icu4swift — Next Steps
 
-*Last updated: 2026-04-01*
+*Last updated: 2026-04-03*
 
-## Current State
+## Immediate Priority: Fix Hindu Calendar Accuracy
 
-Phases 1-3, 4a, 4b, 6, and 7 are complete. 14 of 22 calendars implemented. 237 tests passing.
+Phase 5 is implemented but has accuracy issues. All 6 Hindu calendars are functional (round-trips work, protocol conformance complete), but validation against the Hindu project's CSV reference data shows failures that should not exist.
 
-Only CalendarHindu (6 calendars) remains before DateFormat can begin. Islamic Umm al-Qura and Observational variants are deferred (require lookup tables or complex crescent visibility criteria).
+### The Problem
 
-## Recommended Order
+Our refactored MoshierSunrise produces sunrise times ~2.5 minutes different from the original Hindu project's Rise.swift. This causes month boundary misalignments in Malayalam (339 failures), Tamil (6), Bengali (12), and lunisolar (191). The original Hindu project's Swift port has **0 errors** on Tamil/Odia/Malayalam.
 
-### 1. CalendarHindu (Phase 5) — Large complexity
+### Option A: Use Hindu project as package dependency (recommended)
 
-**Depends on:** Phase 4a.
+Add `hindu-calendar` as a Swift package dependency. CalendarHindu calls `Ephemeris()`, `Tithi()`, `Masa()`, `Solar()` directly — guaranteed bit-identical results, zero porting bugs.
 
-**Deliverables:**
-- Lunisolar Amanta and Purnimanta
-- Solar Tamil, Bengali, Odia, Malayalam
-- Adapter from existing Hindu calendar code to `CalendarProtocol`
+```swift
+.package(url: "https://github.com/dra8an/hindu-calendar.git", branch: "main"),
+```
 
-**Source:** `hindu-calendar/swift/` adapted to use `HybridEngine`.
+### Option B: Find and fix the numerical difference
+
+Debug why our MoshierSunrise produces different sunrise times. The solar longitude matches to 0.001° but sunrise differs by 2.5 minutes. Likely in the `sscc` sine/cosine table or the iterative sunrise refinement loop. High effort, uncertain payoff.
+
+## After Hindu Fix
+
+### 1. DateFormat (Phase 8) — Very Large complexity
 
 ### 2. DateFormat (Phase 8) — Very Large complexity
 

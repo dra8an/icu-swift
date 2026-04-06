@@ -105,9 +105,8 @@ public enum MoshierSunrise {
         }
         var h0 = -sinclairRefractionHorizon(atpress, 0.0)
         h0 -= SOLAR_SEMIDIAM_ARCMIN / 60.0
-        if alt > 0 {
-            h0 -= 0.0353 * sqrt(alt)
-        }
+        // Horizon dip not applied: inland cities on flat terrain have no
+        // ocean-visible horizon, so the dip formula is not appropriate.
 
         let ymd = MoshierSolar.jdToYMD(jdUt)
         let jd0h = MoshierSolar.ymdToJD(year: ymd.year, month: ymd.month, day: ymd.day, hour: 0.0)

@@ -4,16 +4,17 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 
 ## Calendar Systems
 
-14 calendar systems implemented across 7 targets:
+20 calendar systems implemented across 8 targets:
 
 | Target | What | Notes |
 |--------|------|-------|
-| **CalendarCore** | Protocols and types | `CalendarProtocol`, `Date<C>`, `RataDie`, `Month`, `Weekday`, `YearInfo` |
+| **CalendarCore** | Protocols and types | `CalendarProtocol`, `Date<C>`, `RataDie`, `Month`, `Weekday`, `YearInfo`, `Location`, `DateStatus` |
 | **CalendarSimple** | ISO, Gregorian, Julian, Buddhist, ROC | Gregorian-family arithmetic with era/offset variants |
 | **CalendarComplex** | Hebrew, Coptic, Ethiopian, Persian, Indian | Lunisolar, 13-month, and solar calendars |
 | **CalendarJapanese** | Japanese | Gregorian + era overlay (Meiji→Reiwa), extensible era table |
 | **AstronomicalEngine** | Moshier + Reingold + Hybrid | VSOP87/DE404 (±1″) and Meeus polynomials |
 | **CalendarAstronomical** | Islamic Tabular, Chinese, Dangi | 30-year cycle arithmetic + lunisolar astronomical |
+| **CalendarHindu** | Tamil, Bengali, Odia, Malayalam, Amanta, Purnimanta | Solar + lunisolar Hindu calendars (accuracy WIP) |
 | **DateArithmetic** | `DateDuration`, add/until | Temporal-spec algorithms, works with all calendars |
 
 ### Planned
@@ -21,7 +22,6 @@ A type-safe Swift calendar library inspired by [ICU4X](https://github.com/unicod
 | Target | What |
 |--------|------|
 | **CalendarAstronomical** | Islamic (Umm al-Qura, Observational) |
-| **CalendarHindu** | Lunisolar (Amanta, Purnimanta), Solar (Tamil, Bengali, Odia, Malayalam) |
 | **DateFormat** | Semantic skeletons, raw patterns, CLDR data |
 | **DateParse** | Pattern-based parsing |
 | **DateFormatInterval** | Interval and relative formatting |
@@ -108,7 +108,7 @@ targets: [
 
 ## Testing
 
-237 tests across 39 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
+270 tests across 44 suites, verified against ICU4X reference data and Reingold & Dershowitz "Calendrical Calculations" (4th ed.).
 
 ```bash
 swift test
