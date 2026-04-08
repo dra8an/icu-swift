@@ -8,7 +8,7 @@ icu4swift is a type-safe Swift calendar library porting algorithms from ICU4X (R
 
 ```bash
 swift build              # Build all targets
-swift test -c release    # Run all 270 tests (~5 seconds in release mode)
+swift test -c release    # Run all 283 tests (~30 seconds in release mode)
 ```
 
 No external dependencies. Swift 6.0, strict concurrency enabled.
@@ -24,7 +24,7 @@ Sources/
   CalendarComplex/       # Hebrew, Coptic, Ethiopian, Persian, Indian + arithmetic helpers
   CalendarJapanese/      # Japanese calendar with era data (Meiji→Reiwa)
   AstronomicalEngine/    # Reingold + Moshier + HybridEngine, Moment, Location
-  CalendarAstronomical/  # Islamic Tabular, Chinese, Dangi + year cache
+  CalendarAstronomical/  # Islamic Tabular + Islamic Civil, Chinese, Dangi + year cache
   CalendarHindu/         # Tamil, Bengali, Odia, Malayalam (solar) + Amanta, Purnimanta (lunisolar) + Ayanamsa
   DateArithmetic/        # DateDuration, Date.added(), Date.until(), balance algorithm
 Tests/
@@ -33,7 +33,7 @@ Tests/
   CalendarComplexTests/  # 53 tests for complex calendars
   CalendarJapaneseTests/ # 15 tests for Japanese calendar
   AstronomicalEngineTests/ # 36 tests for Reingold, Moshier, cross-validation
-  CalendarAstronomicalTests/ # 35 tests for Islamic, Chinese, Dangi + perf
+  CalendarAstronomicalTests/ # tests for Islamic Tabular, Islamic Civil, Chinese, Dangi + perf + regression
   CalendarHinduTests/    # 33 tests: ayanamsa, solar, lunisolar, CSV regression
   DateArithmeticTests/   # 24 tests for date arithmetic
 Docs/                    # Architecture analysis and implementation plan
@@ -53,6 +53,7 @@ Docs/                    # Architecture analysis and implementation plan
 - **CalendarJapanese** depends on CalendarSimple (shares `IsoDateInner` and `GregorianArithmetic`). `IsoDateInner` fields and init are `public` so CalendarJapanese can access them across module boundaries. `JapaneseEraData` is a struct with a sorted era table — extensible for future eras without code changes.
 - **AstronomicalEngine** depends only on CalendarCore (for `RataDie`). Contains `Moment` (fractional RataDie), `Location`, and three engine implementations. MoshierEngine is refactored from the Hindu calendar project — all mutable scratch arrays converted to local variables for `Sendable`. Validated against real Swiss Ephemeris (JPL DE431) to 0.00001° precision.
 - **CalendarAstronomical** depends on CalendarCore, CalendarSimple, and AstronomicalEngine. Chinese calendar uses `HybridEngine` for astronomical calculations with `ChineseYearCache` for performance. `ChineseYearData.compute` uses a `findNewYear` helper called for both the current and next Chinese year, then iterates exactly 12 months between them and applies the "13th month is leap if no leap detected" fallback (matching ICU4X's `month_structure_for_year`). Leap detection uses forward comparison of major solar terms, taking the **last** same-term pair and only committing if `current != nextNewYear` (guards against boundary-precision false positives). `newMoonOnOrAfter` applies a sub-10-second midnight epsilon snap to match HKO boundary placements. Chinese calendar validates against authoritative Hong Kong Observatory data in `Tests/CalendarAstronomicalTests/chinese_months_1901_2100_hko.csv` — see `Docs/Chinese_reference.md`.
+- **Islamic Tabular & Civil** are two CLDR calendars sharing one arithmetic implementation (`IslamicTabularArithmetic`, epoch-parameterized). `IslamicTabular` (identifier `islamic-tbla`) takes a `TabularEpoch` and defaults to `.thursday` (Jul 15, 622 Julian); `IslamicCivil` (identifier `islamic-civil`) is a separate calendar facade hard-coded to `.friday` (Jul 16, 622 Julian). Both share `IslamicTabularDateInner`. Validated daily 1900–2100 against two independent sources (Foundation and Python `convertdate`) — see `Docs/Islamic_reference.md`. The `yearFromFixed` formula must use ICU4X's exact `floor((30·diff + 10646) / 10631)` — the simpler `30·diff/10631 + 1` approximation is off-by-one at end-of-year boundaries.
 
 ## Implementation Plan
 
@@ -61,7 +62,7 @@ See `Docs/Swift_Implementation_Plan.md` for the full 10-phase plan. Phases 1-3, 
 - Phase 2: CalendarSimple — ISO, Gregorian, Julian, Buddhist, ROC (done)
 - Phase 3: CalendarComplex — Hebrew, Coptic, Ethiopian, Persian, Indian (done)
 - Phase 4a: AstronomicalEngine — Reingold + Moshier + HybridEngine (done)
-- Phase 4b: CalendarAstronomical — Islamic Tabular, Chinese, Dangi (done)
+- Phase 4b: CalendarAstronomical — Islamic Tabular, Islamic Civil, Chinese, Dangi (done)
 - Phase 6: CalendarJapanese — Japanese with era data (done)
 - Phase 7: DateArithmetic — DateDuration, add/until/balance (done)
 
