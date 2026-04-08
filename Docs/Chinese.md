@@ -82,7 +82,7 @@ The tolerance is tight enough that no normal new moon timing is affected — onl
 
 ## Validation
 
-The Chinese calendar is validated against **Hong Kong Observatory** (HKO) authoritative data — see `Docs/HKO_reference.md`. The regression test at `Tests/CalendarAstronomicalTests/ChineseRegressionTests.swift` checks all 2,461 month rows across Chinese years 1901–2099 (199 years, 73 of them leap) against `chinese_months_1901_2100_hko.csv`.
+The Chinese calendar is validated against **Hong Kong Observatory** (HKO) authoritative data — see `Docs/Chinese_reference.md`. The regression test at `Tests/CalendarAstronomicalTests/ChineseRegressionTests.swift` checks all 2,461 month rows across Chinese years 1901–2099 (199 years, 73 of them leap) against `chinese_months_1901_2100_hko.csv`.
 
 **Current accuracy: 2,458 / 2,461 rows match HKO (~99.88%).** The 3 remaining failures are all in a single 1906 M03→M04 cluster, where Moshier places the April 1906 new moon 8 minutes before midnight Apr 24 LMT while HKO places it on Apr 24 — a genuine astronomical model disagreement at the historical end of the table, accepted as a known limitation.
 
@@ -162,5 +162,5 @@ Regression test (`ChineseRegressionTests.swift`):
 - ICU4X `calendrical_calculations/src/chinese_based.rs` — `get_leap_month_from_new_year`, `month_structure_for_year`, `major_solar_term_from_fixed`, `new_moon_on_or_after`, `new_moon_before`, `winter_solstice_on_or_before`, `new_year_in_sui`
 - ICU4X `components/calendar/src/cal/east_asian_traditional.rs` — reference data, leap_month indexing semantics (`leap_month` returns the 1-indexed ordinal position, display number = position - 1)
 - Reingold & Dershowitz, *Calendrical Calculations*, 4th edition, Chapter 19
-- **Hong Kong Observatory** lunisolar tables for 1901-2100 — authoritative validation source. See `Docs/HKO_reference.md`.
+- **Hong Kong Observatory** lunisolar tables for 1901-2100 — authoritative validation source. See `Docs/Chinese_reference.md`.
 - Swiss Ephemeris (JPL DE431) — leap month boundary validation for 2023

@@ -8,7 +8,7 @@
 
 ## Chinese Calendar Investigation — Mostly Resolved
 
-**Status:** 3 regression failures remaining, down from 245. All 23 unit tests passing. See `Docs/HKO_reference.md` for the authoritative data setup, and `backup/README.md` for snapshots of intermediate states.
+**Status:** 3 regression failures remaining, down from 245. All 23 unit tests passing. See `Docs/Chinese_reference.md` for the authoritative data setup, and `backup/README.md` for snapshots of intermediate states.
 
 ### What we did
 1. **Switched the regression test from an ICU4X-derived CSV to authoritative Hong Kong Observatory data** (`Data/hko_raw/T{1901..2100}e.txt`, generator at `Data/build_hko_csv.py`, CSV at `Tests/CalendarAstronomicalTests/chinese_months_1901_2100_hko.csv`). The ICU4X-derived CSV had a generator off-by-one bug producing ~121 false alarms.
