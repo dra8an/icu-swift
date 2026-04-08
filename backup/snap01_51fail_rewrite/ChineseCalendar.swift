@@ -329,21 +329,11 @@ struct ChineseYearData {
             return Moment(Double(rd.dayNumber)) - offset
         }
 
-        // Helper: find new moon on or after a date in local time, return local RD.
-        // When the new moon falls within ~10 seconds of local midnight (after midnight),
-        // snap it back to the previous day to match HKO's authoritative tables. The
-        // boundary precision of Moshier (VSOP87) vs HKO's source (likely JPL-grade)
-        // can disagree by a few seconds at conjunctions; HKO has been observed to
-        // place such "just-past-midnight" new moons on the prior day (e.g. 2057-09).
+        // Helper: find new moon on or after a date in local time, return local RD
         func newMoonOnOrAfter(_ rd: RataDie) -> RataDie {
             let nmMoment = engine.newMoonAtOrAfter(midnight(rd))
             let offset = V.utcOffset(rd: nmMoment.rataDie)
-            let local = (nmMoment + offset).inner
-            let frac = local - local.rounded(.down)
-            if frac < 1e-4 {
-                return RataDie(Int64(local.rounded(.down)) - 1)
-            }
-            return RataDie(Int64(local.rounded(.down)))
+            return (nmMoment + offset).rataDie
         }
 
         // Helper: find new moon on or before a date in local time, return local RD.
@@ -410,36 +400,35 @@ struct ChineseYearData {
         // After 12 iterations, if there's still a 13th month before next_new_year and
         // no leap was detected, the 13th month is the leap month.
         var monthLengths: [Bool] = []
-        // Track the LAST same-term pair found within the 12-iter window. When
-        // boundary precision causes a false positive (typically earlier in the
-        // year, when a zhōngqì falls within ~1 hour of local midnight), the real
-        // leap is later — so taking the last match is more robust than the first.
-        var detectedLeap: UInt8? = nil
+        var leapMonthNum: UInt8? = nil
         var current = newYear
         var currentTerm = majorSolarTerm(current)
 
         for i in 0..<12 {
             let next = newMoonOnOrAfter(RataDie(current.dayNumber + 1))
             let nextTerm = majorSolarTerm(next)
-            if currentTerm == nextTerm {
+            // The current month has no zhōngqì iff its starting solar term equals
+            // the next month's starting solar term. That makes the current month a leap.
+            if leapMonthNum == nil && currentTerm == nextTerm {
                 // i is 0-indexed slot of current month within the year.
-                // Display number for the leap = i (since the leap duplicates the
-                // preceding regular month's number).
-                detectedLeap = UInt8(i)
+                // 1-indexed slot = i + 1. Display number = (i + 1) - 1 = i.
+                // (Leap month duplicates the preceding regular month's number.)
+                leapMonthNum = UInt8(i)
             }
             monthLengths.append((next.dayNumber - current.dayNumber) == 30)
             current = next
             currentTerm = nextTerm
         }
 
-        var leapMonthNum: UInt8? = nil
         if current != nextNewYear {
-            // 13-month year: append the trailing 13th month and commit the leap.
+            // 13-month year: append the trailing 13th month.
             monthLengths.append((nextNewYear.dayNumber - current.dayNumber) == 30)
-            // Use detected leap if any; otherwise the 13th (M11L-style) is the leap.
-            leapMonthNum = detectedLeap ?? 12
+            if leapMonthNum == nil {
+                // No leap detected via forward comparison — the 13th month must be leap.
+                // Its 1-indexed slot is 13, display number = 12.
+                leapMonthNum = 12
+            }
         }
-        // 12-month year: no leap, even if a false positive fired (deliberately ignored).
 
         return ChineseYearData(
             newYear: newYear,

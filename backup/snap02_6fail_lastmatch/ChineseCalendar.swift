@@ -329,21 +329,11 @@ struct ChineseYearData {
             return Moment(Double(rd.dayNumber)) - offset
         }
 
-        // Helper: find new moon on or after a date in local time, return local RD.
-        // When the new moon falls within ~10 seconds of local midnight (after midnight),
-        // snap it back to the previous day to match HKO's authoritative tables. The
-        // boundary precision of Moshier (VSOP87) vs HKO's source (likely JPL-grade)
-        // can disagree by a few seconds at conjunctions; HKO has been observed to
-        // place such "just-past-midnight" new moons on the prior day (e.g. 2057-09).
+        // Helper: find new moon on or after a date in local time, return local RD
         func newMoonOnOrAfter(_ rd: RataDie) -> RataDie {
             let nmMoment = engine.newMoonAtOrAfter(midnight(rd))
             let offset = V.utcOffset(rd: nmMoment.rataDie)
-            let local = (nmMoment + offset).inner
-            let frac = local - local.rounded(.down)
-            if frac < 1e-4 {
-                return RataDie(Int64(local.rounded(.down)) - 1)
-            }
-            return RataDie(Int64(local.rounded(.down)))
+            return (nmMoment + offset).rataDie
         }
 
         // Helper: find new moon on or before a date in local time, return local RD.

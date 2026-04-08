@@ -329,21 +329,11 @@ struct ChineseYearData {
             return Moment(Double(rd.dayNumber)) - offset
         }
 
-        // Helper: find new moon on or after a date in local time, return local RD.
-        // When the new moon falls within ~10 seconds of local midnight (after midnight),
-        // snap it back to the previous day to match HKO's authoritative tables. The
-        // boundary precision of Moshier (VSOP87) vs HKO's source (likely JPL-grade)
-        // can disagree by a few seconds at conjunctions; HKO has been observed to
-        // place such "just-past-midnight" new moons on the prior day (e.g. 2057-09).
+        // Helper: find new moon on or after a date in local time, return local RD
         func newMoonOnOrAfter(_ rd: RataDie) -> RataDie {
             let nmMoment = engine.newMoonAtOrAfter(midnight(rd))
             let offset = V.utcOffset(rd: nmMoment.rataDie)
-            let local = (nmMoment + offset).inner
-            let frac = local - local.rounded(.down)
-            if frac < 1e-4 {
-                return RataDie(Int64(local.rounded(.down)) - 1)
-            }
-            return RataDie(Int64(local.rounded(.down)))
+            return (nmMoment + offset).rataDie
         }
 
         // Helper: find new moon on or before a date in local time, return local RD.
@@ -375,71 +365,79 @@ struct ChineseYearData {
                 .truncatingRemainder(dividingBy: 12.0)) + 1
         }
 
-        // Helper: find the new year (M01 start) for the Chinese year whose
-        // related ISO year corresponds to a given January 1 RD. Uses the
-        // sui (winter-solstice-to-winter-solstice) algorithm: M01 is the
-        // 2nd new moon after the prior solstice (or 3rd if M11 or M12 of the
-        // prior year is a leap month).
-        func findNewYear(forJan1 j1: RataDie) -> RataDie {
-            let search = midnight(RataDie(j1.dayNumber + 30))
-            let estimate = Astronomical.estimatePriorSolarLongitude(angle: 270.0, moment: search)
-            var sd = Moment(estimate.inner.rounded(.down))
-            while 270.0 >= engine.solarLongitude(at: midnight(RataDie(Int64(sd.inner + 1.0)))) {
-                sd = sd + 1.0
-            }
-            let solsticeRd = sd.rataDie
-            // M11 = lunar month containing the winter solstice = nm on/before solstice.
-            let m11 = newMoonOnOrBefore(solsticeRd)
-            // Skip to M12, then M01 (or further if there's a leap M11/M12).
-            let m12 = newMoonOnOrAfter(RataDie(m11.dayNumber + 1))
-            let m13 = newMoonOnOrAfter(RataDie(m12.dayNumber + 1))
-            // Detect leap M11 or M12: same major solar term as the next month.
-            if majorSolarTerm(m11) == majorSolarTerm(m12) || majorSolarTerm(m12) == majorSolarTerm(m13) {
-                // Leap was M11 or M12 — new year is one nm later.
-                return newMoonOnOrAfter(RataDie(m13.dayNumber + 1))
-            }
-            return m13
+        // Find the winter solstice (solar longitude = 270°) before this date.
+        let searchMoment = midnight(RataDie(jan1.dayNumber + 30))
+        let solsticeMoment = Astronomical.estimatePriorSolarLongitude(angle: 270.0, moment: searchMoment)
+        var solsticeDay = Moment(solsticeMoment.inner.rounded(.down))
+        while 270.0 >= engine.solarLongitude(at: midnight(RataDie(Int64(solsticeDay.inner + 1.0)))) {
+            solsticeDay = solsticeDay + 1.0
+        }
+        let solsticeRd = solsticeDay.rataDie
+
+        // The 11th month is the lunar month CONTAINING the winter solstice.
+        let nm11 = newMoonOnOrBefore(solsticeRd)
+
+        var newMoons: [RataDie] = [nm11]
+        var current = nm11
+        for _ in 0..<16 {
+            current = newMoonOnOrAfter(RataDie(current.dayNumber + 1))
+            newMoons.append(current)
         }
 
-        let newYear = findNewYear(forJan1: jan1)
-        let nextJan1 = GregorianArithmetic.fixedFromGregorian(year: relatedIso + 1, month: 1, day: 1)
-        let nextNewYear = findNewYear(forJan1: nextJan1)
+        // Find next winter solstice
+        let nextSearchMoment = midnight(RataDie(solsticeRd.dayNumber + 370))
+        let nextSolsticeMoment = Astronomical.estimatePriorSolarLongitude(angle: 270.0, moment: nextSearchMoment)
+        var nextSolsticeDay = Moment(nextSolsticeMoment.inner.rounded(.down))
+        while 270.0 >= engine.solarLongitude(at: midnight(RataDie(Int64(nextSolsticeDay.inner + 1.0)))) {
+            nextSolsticeDay = nextSolsticeDay + 1.0
+        }
+        let nextSolsticeRd = nextSolsticeDay.rataDie
 
-        // Iterate exactly 12 months from new year, computing lengths and detecting
-        // a leap month via forward comparison of major solar terms.
-        // After 12 iterations, if there's still a 13th month before next_new_year and
-        // no leap was detected, the 13th month is the leap month.
+        let nextNm11 = newMoonOnOrBefore(nextSolsticeRd)
+        let moonsBetweenSolstices = newMoons.filter { $0 >= nm11 && $0 < nextNm11 }.count
+        let hasLeapMonth = moonsBetweenSolstices == 13
+
+        let majorSolarTerms: [UInt32] = newMoons.map { majorSolarTerm($0) }
+
+        // nm[0] = M11. Normally nm[2] = M01. If M11 or M12 is leap, nm[3] = M01.
+        var newYearIndex = 2
+        if hasLeapMonth {
+            for i in 0..<2 {
+                if majorSolarTerms[i] == majorSolarTerms[i + 1] {
+                    newYearIndex = 3
+                    break
+                }
+            }
+        }
+
+        let newYear = newMoons[newYearIndex]
+
         var monthLengths: [Bool] = []
-        // Track the LAST same-term pair found within the 12-iter window. When
-        // boundary precision causes a false positive (typically earlier in the
-        // year, when a zhōngqì falls within ~1 hour of local midnight), the real
-        // leap is later — so taking the last match is more robust than the first.
-        var detectedLeap: UInt8? = nil
-        var current = newYear
-        var currentTerm = majorSolarTerm(current)
-
-        for i in 0..<12 {
-            let next = newMoonOnOrAfter(RataDie(current.dayNumber + 1))
-            let nextTerm = majorSolarTerm(next)
-            if currentTerm == nextTerm {
-                // i is 0-indexed slot of current month within the year.
-                // Display number for the leap = i (since the leap duplicates the
-                // preceding regular month's number).
-                detectedLeap = UInt8(i)
-            }
-            monthLengths.append((next.dayNumber - current.dayNumber) == 30)
-            current = next
-            currentTerm = nextTerm
-        }
-
         var leapMonthNum: UInt8? = nil
-        if current != nextNewYear {
-            // 13-month year: append the trailing 13th month and commit the leap.
-            monthLengths.append((nextNewYear.dayNumber - current.dayNumber) == 30)
-            // Use detected leap if any; otherwise the 13th (M11L-style) is the leap.
-            leapMonthNum = detectedLeap ?? 12
+        var monthNum: UInt8 = 1
+
+        for i in newYearIndex..<min(newYearIndex + 13, newMoons.count - 1) {
+            let len = newMoons[i + 1].dayNumber - newMoons[i].dayNumber
+            let isLong = len == 30
+
+            if hasLeapMonth && leapMonthNum == nil {
+                if i + 1 < majorSolarTerms.count && majorSolarTerms[i] == majorSolarTerms[i + 1] {
+                    leapMonthNum = monthNum - 1
+                    monthLengths.append(isLong)
+                    continue
+                }
+            }
+
+            monthLengths.append(isLong)
+            monthNum += 1
+
+            if monthNum > 12 && leapMonthNum == nil && !hasLeapMonth { break }
+            if monthNum > 13 { break }
         }
-        // 12-month year: no leap, even if a false positive fired (deliberately ignored).
+
+        while monthLengths.count < 12 { monthLengths.append(false) }
+        if !hasLeapMonth && monthLengths.count > 12 { monthLengths = Array(monthLengths.prefix(12)) }
+        if monthLengths.count > 13 { monthLengths = Array(monthLengths.prefix(13)) }
 
         return ChineseYearData(
             newYear: newYear,
