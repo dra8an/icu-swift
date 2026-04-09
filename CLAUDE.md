@@ -55,6 +55,13 @@ Docs/                    # Architecture analysis and implementation plan
 - **CalendarAstronomical** depends on CalendarCore, CalendarSimple, and AstronomicalEngine. Chinese calendar uses `HybridEngine` for astronomical calculations with `ChineseYearCache` for performance. `ChineseYearData.compute` uses a `findNewYear` helper called for both the current and next Chinese year, then iterates exactly 12 months between them and applies the "13th month is leap if no leap detected" fallback (matching ICU4X's `month_structure_for_year`). Leap detection uses forward comparison of major solar terms, taking the **last** same-term pair and only committing if `current != nextNewYear` (guards against boundary-precision false positives). `newMoonOnOrAfter` applies a sub-10-second midnight epsilon snap to match HKO boundary placements. Chinese calendar validates against authoritative Hong Kong Observatory data in `Tests/CalendarAstronomicalTests/chinese_months_1901_2100_hko.csv` — see `Docs/Chinese_reference.md`.
 - **Islamic Tabular & Civil** are two CLDR calendars sharing one arithmetic implementation (`IslamicTabularArithmetic`, epoch-parameterized). `IslamicTabular` (identifier `islamic-tbla`) takes a `TabularEpoch` and defaults to `.thursday` (Jul 15, 622 Julian); `IslamicCivil` (identifier `islamic-civil`) is a separate calendar facade hard-coded to `.friday` (Jul 16, 622 Julian). Both share `IslamicTabularDateInner`. Validated daily 1900–2100 against two independent sources (Foundation and Python `convertdate`) — see `Docs/Islamic_reference.md`. The `yearFromFixed` formula must use ICU4X's exact `floor((30·diff + 10646) / 10631)` — the simpler `30·diff/10631 + 1` approximation is off-by-one at end-of-year boundaries.
 
+## Test Coverage and Per-Calendar Docs
+
+See `Docs/TestCoverageAndDocs.md` for the master index of which calendars
+have a `Docs/X.md`, a `Docs/X_reference.md`, and a regression test (with
+row counts and reference sources). **Keep that file in sync** whenever you
+add new calendar docs, regression tests, or reference CSVs.
+
 ## Implementation Plan
 
 See `Docs/Swift_Implementation_Plan.md` for the full 10-phase plan. Phases 1-3, 4a, 4b, 6, and 7 are complete:
