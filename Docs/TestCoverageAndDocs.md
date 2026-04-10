@@ -12,11 +12,11 @@ still rely only on hand-picked unit tests.
 
 | Calendar | `Docs/X.md` | `Docs/X_reference.md` | Regression Test | Reference Source |
 |---|:---:|:---:|:---:|---|
-| **ISO** | – | – | – | (trivial, unit-tested) |
-| **Gregorian** | – | – | – | (trivial, unit-tested) |
-| **Julian** | – | – | – | (unit-tested) |
-| **Buddhist** | – | – | – | (Gregorian + offset) |
-| **ROC** | – | – | – | (Gregorian + offset) |
+| **ISO** | – | – | n/a | Trivial arithmetic; unit-tested, no regression needed |
+| **Gregorian** | – | – | n/a | ISO + era labels; unit-tested, no regression needed |
+| **Julian** | – | – | n/a | Single leap rule (`y%4==0`); unit-tested, no regression needed |
+| **Buddhist** | – | – | n/a | ISO + 543 offset; unit-tested, no regression needed |
+| **ROC** | – | – | n/a | ISO − 1911 offset; unit-tested, no regression needed |
 | **Hebrew** | ✅ [`Hebrew.md`](Hebrew.md) | ✅ [`Hebrew_reference.md`](Hebrew_reference.md) | ✅ 73,414 / 0 | Hebcal (`@hebcal/core`) |
 | **Coptic** | – | – | ✅ 3,266 / 0 | Foundation + convertdate |
 | **Ethiopian** | – | – | ✅ 3,266 / 0 | Foundation + convertdate |
@@ -26,7 +26,7 @@ still rely only on hand-picked unit tests.
 | **Islamic Tabular** | ✅ [`Islamic.md`](Islamic.md) | ✅ [`Islamic_reference.md`](Islamic_reference.md) | ✅ 73,414 / 0 | Foundation + convertdate |
 | **Islamic Civil** | ✅ shared | ✅ shared | ✅ 73,414 / 0 | Foundation + convertdate |
 | **Chinese** | ✅ [`Chinese.md`](Chinese.md) | ✅ [`Chinese_reference.md`](Chinese_reference.md) | ⚠️ 2,461 / 3 | Hong Kong Observatory |
-| **Dangi** | ✅ [`Dangi.md`](Dangi.md) | – | – | unit-tested only |
+| **Dangi** | ✅ [`Dangi.md`](Dangi.md) | – | deferred | Structurally identical to Chinese (different longitude only); KASI data available via `korean_lunar_calendar_py` if needed |
 | **Hindu Tamil** (solar) | ✅ [`HinduCalendars.md`](HinduCalendars.md) | – | ✅ 1,811 / 0 | built-in CSV |
 | **Hindu Bengali** (solar) | ✅ shared | – | ✅ 1,811 / 0 | built-in CSV |
 | **Hindu Odia** (solar) | ✅ shared | – | ✅ 1,811 / 0 | built-in CSV |
@@ -38,13 +38,13 @@ Legend: regression `✅ N / F` = N rows checked, F failures.
 
 ## Coverage Gaps Worth Closing
 
-**Harder:**
+**Deferred:**
 
-- **Dangi** — astronomical, structurally Chinese with a Korean reference longitude. KASI (Korean Astronomy and Space Science Institute) publishes lunisolar tables but they're less accessible than HKO. Would parallel the Chinese regression with potentially the same kind of model-vs-observed precision issues.
+- **Dangi** — structurally identical to Chinese (same algorithm, same leap rules), differing only in reference longitude (Seoul UTC+9 vs Beijing UTC+8). Differences only appear when a new moon falls in the ~1-hour window between Korean and Chinese midnight. KASI (Korea Astronomy and Space Science Institute) has an Open API and the Python `korean_lunar_calendar_py` library embeds KASI-sourced lookup tables for 1000–2050. No Foundation `.korean` calendar exists. Low priority — can be revisited if Dangi-specific bugs surface.
 
-**Don't need anything:**
+**No regression needed:**
 
-- ISO / Gregorian / Julian / Buddhist / ROC — arithmetic is identical across every implementation in existence; unit tests are sufficient.
+- ISO / Gregorian / Julian / Buddhist / ROC — trivial arithmetic (same in every implementation); unit tests are sufficient. Marked `n/a` in the table above.
 
 ## Adding a New Regression — Pattern
 
