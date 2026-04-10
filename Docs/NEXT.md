@@ -43,19 +43,21 @@ ISO, Gregorian, Julian, Buddhist, ROC, Coptic, Ethiopian, Persian, Hebrew,
 Indian, Japanese, Islamic Tabular, Islamic Civil. All sub-microsecond per
 conversion; no further perf work warranted.
 
-### Lowest-hanging fruit when we dig in
+### Strategy — based on ICU4X design research
 
-1. **Profile Moshier itself.** It's the bottom of the pyramid for
-   *everything* astronomical — any speedup there compounds across all six
-   astronomical calendars.
-2. **`ChineseYearCache` sizing & lifetime.** Currently LRU 8. Should it
-   grow? Should it become per-calendar instance vs shared?
-3. **Share cache across Chinese ↔ Dangi.** The underlying year-boundary
-   computations (winter solstice, new moons around it) overlap heavily —
-   only the reference longitude differs (Beijing vs Seoul). A shared
-   underlying year-data layer could halve the cost when both are used.
-4. **Hindu engine profiling** — has not been targeted yet; may have its
-   own low-hanging fruit independent of Moshier.
+See **[`BakedDataStrategy.md`](BakedDataStrategy.md)** for the full
+analysis and prioritized action plan, informed by ICU4X contributor input.
+
+**Summary of the 5 actions (in priority order):**
+
+1. **Bake Chinese year data for 1900–2100** — use HKO-validated CSV to
+   generate a const Swift array (~200 entries). Eliminates all Moshier
+   calls for common dates. 600 ms → 0 ms.
+2. **Pack `ChineseYearData` into a fixed-size value type** — replace
+   `[Bool]` heap alloc with a UInt16 bitmask + UInt8 offset + UInt8 leap.
+3. **Bake Dangi year data** — same format, KASI-sourced.
+4. **Profile and consider caching for Hindu calendars.**
+5. **Future: Umm al-Qura with baked data** (if/when implemented).
 
 ## After Astronomical Perf Work
 

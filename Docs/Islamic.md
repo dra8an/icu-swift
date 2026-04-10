@@ -236,6 +236,84 @@ Both fixes landed together; both calendars are now at 0 failures.
 - **73,414 daily conversions** for each of `IslamicTabular` and `IslamicCivil`
   (1900–2100), 0 failures.
 
+## Islamic Umm al-Qura (`islamic-umalqura`)
+
+### Overview
+
+The Umm al-Qura calendar is the **official civil calendar of Saudi Arabia**,
+published by KACST (King Abdulaziz City for Science and Technology). Unlike
+the tabular calendars, its month lengths are determined by astronomical new
+moon predictions for Mecca — they do not follow a fixed alternating pattern.
+
+For years **1300–1600 AH** (~1882–2174 CE), icu4swift uses a precomputed
+301-entry data table. Outside that range, it falls back to Islamic Civil
+(Friday epoch, Type II) arithmetic — matching ICU4X's behavior.
+
+### Packed Data Format
+
+Each year is stored as a single `UInt16` (same format as ICU4X's
+`PackedHijriYearData`):
+
+```
+Bits  0-11: Month length flags (1 = 30 days, 0 = 29 days), month 1 in bit 0
+Bit     12: Sign flag for start-day offset (1 = negative)
+Bits 13-15: Absolute value of offset from mean tabular start day
+```
+
+The mean tabular start is `FRIDAY_EPOCH + (year − 1) × 10631 / 30`. The
+offset (max ±1 in practice) captures the difference between the tabular
+mean and the actual Umm al-Qura new year.
+
+### ICU4X Epoch Discrepancy
+
+ICU4X's `fixed_from_julian(622, 7, 16)` returns **R.D. 227016**, while our
+`JulianArithmetic.fixedFromJulian(year: 622, month: 7, day: 16)` returns
+**R.D. 227015** — a 1-day difference caused by differing proleptic Julian
+implementations.
+
+This means ICU4X's raw packed data **cannot be used directly** — the offset
+bits are relative to epoch 227016 and decode incorrectly under epoch 227015.
+The month-length bits (0-11) are epoch-independent and match. Our data table
+uses month lengths from ICU4X (originally from ICU4C `islamcal.cpp` / KACST)
+with offsets recomputed for our epoch using Foundation as the reference.
+
+The gen script (`/tmp/gen_uq_packed_correct.swift`) verified round-trip
+correctness for all 301 years against Foundation before emitting the table.
+
+### Tabular Fallback
+
+Outside the baked range (before 1300 or after 1600 AH), `UmmAlQuraYearInfo`
+falls back to Islamic Civil arithmetic — same Type II leap cycle, Friday
+epoch, standard alternating month lengths. This matches ICU4X's behavior
+and produces reasonable (if not observation-accurate) results for historical
+and far-future dates.
+
+### Validation
+
+The regression test checks **4,380 sample points** (first-of-each-month +
+new-year boundary days + end-of-year days) for years 1300–1600 AH against
+Foundation `Calendar(identifier: .islamicUmmAlQura)`:
+
+```
+Umm al-Qura regression: checked 4380 sample points, failures 0
+✔ passed after 0.011 seconds
+```
+
+### Test Coverage
+
+`IslamicUmmAlQuraTests.swift` (10 tests):
+
+- Round-trip within baked range (1300–1600, sampled)
+- Round-trip outside baked range (tabular fallback, years 1–2000)
+- Every-day round-trip for 5 sample years (~1770 days)
+- Year lengths 354/355 for all 301 baked years
+- Month lengths 29/30 for sampled years
+- Consecutive new-year gaps are 354 or 355
+- UQ differs from Islamic Civil (observation vs tabular)
+- Era handling (ah / bh)
+- Identifier check (`islamic-umalqura`)
+- **4,380-point regression** vs Foundation, 0 failures
+
 ## Source
 
 - ICU4X `calendrical_calculations/src/islamic.rs` — primary port source for

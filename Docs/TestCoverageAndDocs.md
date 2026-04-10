@@ -25,6 +25,7 @@ still rely only on hand-picked unit tests.
 | **Japanese** | ✅ [`CalendarJapanese.md`](CalendarJapanese.md) | – | ✅ 2,744 / 0 | Foundation (era mapping, 1873–2100) |
 | **Islamic Tabular** | ✅ [`Islamic.md`](Islamic.md) | ✅ [`Islamic_reference.md`](Islamic_reference.md) | ✅ 73,414 / 0 | Foundation + convertdate |
 | **Islamic Civil** | ✅ shared | ✅ shared | ✅ 73,414 / 0 | Foundation + convertdate |
+| **Islamic Umm al-Qura** | ✅ shared | ✅ shared | ✅ 4,380 / 0 | Foundation (baked KACST data, 1300–1600 AH) |
 | **Chinese** | ✅ [`Chinese.md`](Chinese.md) | ✅ [`Chinese_reference.md`](Chinese_reference.md) | ⚠️ 2,461 / 3 | Hong Kong Observatory |
 | **Dangi** | ✅ [`Dangi.md`](Dangi.md) | – | deferred | Structurally identical to Chinese (different longitude only); KASI data available via `korean_lunar_calendar_py` if needed |
 | **Hindu Tamil** (solar) | ✅ [`HinduCalendars.md`](HinduCalendars.md) | – | ✅ 1,811 / 0 | built-in CSV |
