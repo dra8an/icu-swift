@@ -114,6 +114,27 @@ CalendarJapanese is in a separate module from CalendarSimple. To construct `IsoD
 
 ICU4X's `JapaneseDateInner` is the same as `IsoDateInner` (Gregorian YMD). The era is computed on access, not stored. This is simpler and avoids consistency issues (what if the era data changes?). The lookup is a linear scan of at most 5 entries — negligible cost.
 
+## ICU4C vs ICU4X: Meiji Start Date
+
+ICU4C (and therefore Foundation `Calendar(identifier: .japanese)`) places the
+Meiji era start at **September 8, 1868** — this is Meiji 1/1/1 in the old
+lunisolar calendar, converted to the proleptic Gregorian calendar.
+
+ICU4X (and therefore icu4swift) places the Meiji era start at
+**October 23, 1868** — the date of the era name proclamation.
+
+This is a well-known divergence between the two ICU implementations; neither
+is "wrong" — they simply use different historical conventions for the same
+event. In practice the difference is invisible because **both** fall back to
+`ce`/`bce` for dates before Meiji 6 (January 1, 1873). The modern Gregorian
+calendar was not adopted in Japan until that date, so the lunisolar calendar
+was still in official use for Meiji 1–5. No user-facing date is affected.
+
+The regression test validates from **1873 onward** (Meiji 6), where both
+implementations agree on every era boundary. The CSV is generated from
+Foundation and covers all 5 eras (meiji/taisho/showa/heisei/reiwa) through
+2100 — 2,744 sample points, 0 failures.
+
 ## Source
 
 - **ICU4X** `components/calendar/src/cal/japanese.rs` — main implementation
@@ -122,7 +143,7 @@ ICU4X's `JapaneseDateInner` is the same as `IsoDateInner` (Gregorian YMD). The e
 
 ## Test Coverage
 
-15 tests covering:
+Unit tests (`JapaneseTests.swift`, 15 tests):
 - All 5 era boundary transitions (start dates, day-before = previous era)
 - Heisei→Reiwa consecutive day transition
 - Meiji 6 switchover (pre-1873 → CE, post-1873 → Meiji)
@@ -133,3 +154,8 @@ ICU4X's `JapaneseDateInner` is the same as `IsoDateInner` (Gregorian YMD). The e
 - Round-trip across all era boundaries (3,000+ RD values)
 - BCE dates through Japanese calendar
 - Invalid era rejection
+
+Regression test (`JapaneseRegressionTests.swift`):
+- **2,744 sample points** (first-of-month 1873–2100 + exact era boundary
+  days) vs Foundation, validating era code, era year, month, and day.
+  Currently 0 failures.

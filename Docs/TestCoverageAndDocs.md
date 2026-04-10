@@ -22,7 +22,7 @@ still rely only on hand-picked unit tests.
 | **Ethiopian** | – | – | ✅ 3,266 / 0 | Foundation + convertdate |
 | **Persian** | ✅ [`Persian.md`](Persian.md) | ✅ [`Persian_reference.md`](Persian_reference.md) | ✅ 3,064 / 0 | Foundation + convertdate |
 | **Indian (Saka)** | – | – | ✅ 3,216 / 0 | Foundation + convertdate |
-| **Japanese** | ✅ [`CalendarJapanese.md`](CalendarJapanese.md) | – | – | unit-tested with era data |
+| **Japanese** | ✅ [`CalendarJapanese.md`](CalendarJapanese.md) | – | ✅ 2,744 / 0 | Foundation (era mapping, 1873–2100) |
 | **Islamic Tabular** | ✅ [`Islamic.md`](Islamic.md) | ✅ [`Islamic_reference.md`](Islamic_reference.md) | ✅ 73,414 / 0 | Foundation + convertdate |
 | **Islamic Civil** | ✅ shared | ✅ shared | ✅ 73,414 / 0 | Foundation + convertdate |
 | **Chinese** | ✅ [`Chinese.md`](Chinese.md) | ✅ [`Chinese_reference.md`](Chinese_reference.md) | ⚠️ 2,461 / 3 | Hong Kong Observatory |
