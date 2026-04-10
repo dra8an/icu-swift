@@ -1,6 +1,6 @@
 # Test Coverage and Documentation Status
 
-*Last updated: 2026-04-08*
+*Last updated: 2026-04-10*
 
 This is the master index of per-calendar documentation and regression-test
 coverage. Update it whenever a new calendar doc, regression test, or
@@ -18,10 +18,10 @@ still rely only on hand-picked unit tests.
 | **Buddhist** | – | – | – | (Gregorian + offset) |
 | **ROC** | – | – | – | (Gregorian + offset) |
 | **Hebrew** | ✅ [`Hebrew.md`](Hebrew.md) | ✅ [`Hebrew_reference.md`](Hebrew_reference.md) | ✅ 73,414 / 0 | Hebcal (`@hebcal/core`) |
-| **Coptic** | – | – | – | unit-tested only |
-| **Ethiopian** | – | – | – | unit-tested only |
+| **Coptic** | – | – | ✅ 3,266 / 0 | Foundation + convertdate |
+| **Ethiopian** | – | – | ✅ 3,266 / 0 | Foundation + convertdate |
 | **Persian** | ✅ [`Persian.md`](Persian.md) | ✅ [`Persian_reference.md`](Persian_reference.md) | ✅ 3,064 / 0 | Foundation + convertdate |
-| **Indian (Saka)** | – | – | – | unit-tested only |
+| **Indian (Saka)** | – | – | ✅ 3,216 / 0 | Foundation + convertdate |
 | **Japanese** | ✅ [`CalendarJapanese.md`](CalendarJapanese.md) | – | – | unit-tested with era data |
 | **Islamic Tabular** | ✅ [`Islamic.md`](Islamic.md) | ✅ [`Islamic_reference.md`](Islamic_reference.md) | ✅ 73,414 / 0 | Foundation + convertdate |
 | **Islamic Civil** | ✅ shared | ✅ shared | ✅ 73,414 / 0 | Foundation + convertdate |
@@ -37,12 +37,6 @@ still rely only on hand-picked unit tests.
 Legend: regression `✅ N / F` = N rows checked, F failures.
 
 ## Coverage Gaps Worth Closing
-
-**Quick wins (pure arithmetic, Foundation + convertdate available):**
-
-- **Coptic** — Foundation has `.coptic`. Pure arithmetic, leap rule is `year % 4 == 3`.
-- **Ethiopian** — Foundation has `.ethiopicAmeteMihret` and `.ethiopicAmeteAlem`. Same arithmetic family as Coptic.
-- **Indian (Saka)** — Foundation has `.indian`; convertdate has `indian_civil`. Pure arithmetic, Gregorian-tied.
 
 **Harder:**
 

@@ -22,7 +22,42 @@ See [`TestCoverageAndDocs.md`](TestCoverageAndDocs.md) for the master per-calend
 ### Remaining 3 failures (1 cluster)
 **1906 M03→M04 boundary.** Moshier places the April 1906 new moon at Apr 23 23:52:04 LMT — 8 minutes before midnight. HKO places it on Apr 24. This is an 8-minute discrepancy, too far to be a simple rounding issue, and in the opposite direction from the epsilon fix. Appears to be a real Moshier-vs-HKO astronomical model disagreement at the historical end of the table. Accepted as a known limitation; not worth further investigation unless we change engines.
 
-## After Chinese Investigation
+## Performance — Astronomical Calendars
+
+The next major focus is **further optimization of astronomical calendars**.
+Arithmetic calendars are already sub-microsecond per conversion and are not
+a concern.
+
+### Astronomical (perf-sensitive) calendars
+
+| Calendar | Engine path | Status |
+|---|---|---|
+| Chinese | Moshier + HybridEngine | ~586 ms uncached, ~644 ms cached, **39× speedup over 30 days** via `ChineseYearCache` (LRU 8) |
+| Dangi | Moshier + HybridEngine | Structurally identical to Chinese, no dedicated cache |
+| Hindu Amanta / Purnimanta (lunisolar) | AstronomicalEngine + sunrise/equinox | 100% accurate, perf not yet profiled |
+| Hindu Tamil / Bengali / Odia / Malayalam (solar) | Sun longitude only | 100% accurate, perf not yet profiled |
+
+### Arithmetic (no perf concern) — for reference
+
+ISO, Gregorian, Julian, Buddhist, ROC, Coptic, Ethiopian, Persian, Hebrew,
+Indian, Japanese, Islamic Tabular, Islamic Civil. All sub-microsecond per
+conversion; no further perf work warranted.
+
+### Lowest-hanging fruit when we dig in
+
+1. **Profile Moshier itself.** It's the bottom of the pyramid for
+   *everything* astronomical — any speedup there compounds across all six
+   astronomical calendars.
+2. **`ChineseYearCache` sizing & lifetime.** Currently LRU 8. Should it
+   grow? Should it become per-calendar instance vs shared?
+3. **Share cache across Chinese ↔ Dangi.** The underlying year-boundary
+   computations (winter solstice, new moons around it) overlap heavily —
+   only the reference longitude differs (Beijing vs Seoul). A shared
+   underlying year-data layer could halve the cost when both are used.
+4. **Hindu engine profiling** — has not been targeted yet; may have its
+   own low-hanging fruit independent of Moshier.
+
+## After Astronomical Perf Work
 
 ### 1. DateFormat (Phase 8) — Very Large complexity
 
