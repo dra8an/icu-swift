@@ -185,10 +185,10 @@ struct PackedHijriYearData: Sendable {
     ///
     /// Mean tabular start day for a Hijri year (Friday epoch).
     ///
-    /// Uses our `TabularEpoch.friday` (R.D. 227015), which matches ICU4C / Foundation.
-    /// Note: ICU4X's `fixed_from_julian(622, 7, 16)` returns 227016 (off by 1), so
-    /// ICU4X's packed data cannot be used directly — the offset bits must be recomputed
-    /// for our epoch. The data table below was generated from Foundation.
+    /// Uses our `TabularEpoch.friday` (R.D. 227015), which matches ICU4C / Foundation
+    /// and the official Saudi Umm al-Qura dates. ICU4X's proleptic Julian formula gives
+    /// R.D. 227016 for the same date, so their raw packed data needs offset recomputation.
+    /// Our data table was generated from Foundation with verified round-trip correctness.
     static func meanTabularStart(_ extendedYear: Int32) -> RataDie {
         let fridayEpoch = TabularEpoch.friday.rataDie
         let y = Int64(extendedYear) - 1

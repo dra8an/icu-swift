@@ -264,21 +264,29 @@ The mean tabular start is `FRIDAY_EPOCH + (year − 1) × 10631 / 30`. The
 offset (max ±1 in practice) captures the difference between the tabular
 mean and the actual Umm al-Qura new year.
 
-### ICU4X Epoch Discrepancy
+### Data Table Provenance
 
-ICU4X's `fixed_from_julian(622, 7, 16)` returns **R.D. 227016**, while our
-`JulianArithmetic.fixedFromJulian(year: 622, month: 7, day: 16)` returns
-**R.D. 227015** — a 1-day difference caused by differing proleptic Julian
-implementations.
+The packed data originates from **KACST → ICU4C (`islamcal.cpp`) → ICU4X
+(`ummalqura_data.rs`)**. ICU4X's proleptic Julian formula
+(`fixed_from_julian(622, 7, 16)`) returns **R.D. 227016**, while our
+`JulianArithmetic.fixedFromJulian` returns **R.D. 227015** for the same
+date. This 1-day difference means ICU4X's raw packed UInt16 values cannot
+be used directly — the offset bits (12-15) are relative to their epoch.
 
-This means ICU4X's raw packed data **cannot be used directly** — the offset
-bits are relative to epoch 227016 and decode incorrectly under epoch 227015.
-The month-length bits (0-11) are epoch-independent and match. Our data table
-uses month lengths from ICU4X (originally from ICU4C `islamcal.cpp` / KACST)
-with offsets recomputed for our epoch using Foundation as the reference.
+Our data table uses the same month lengths (bits 0-11, epoch-independent)
+but recomputes the offset bits for our epoch using Foundation as the
+reference. A gen script verified round-trip correctness for all 301 years
+before emitting the table.
 
-The gen script (`/tmp/gen_uq_packed_correct.swift`) verified round-trip
-correctness for all 301 years against Foundation before emitting the table.
+Our output matches **Foundation (ICU4C)** and the **official Saudi
+government Umm al-Qura dates** — verified for specific dates against
+ummulqura.org.sa.
+
+Note: ICU4X historically had an off-by-one bug in Umm al-Qura
+([unicode-org/icu4x#6197](https://github.com/unicode-org/icu4x/issues/6197))
+caused by using astronomical calculations instead of the KACST lookup
+table. This was fixed in PR #6385 by switching to baked KACST data,
+matching ICU4C's approach — the same approach we use.
 
 ### Tabular Fallback
 
