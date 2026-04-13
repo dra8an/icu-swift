@@ -68,45 +68,46 @@ public struct ChineseCalendar<V: EastAsianVariant>: CalendarProtocol, Sendable {
 
     public func newDate(year: YearInput, month: Month, day: UInt8) throws -> ChineseDateInner {
         let relatedIso = try resolveYear(year)
-        let yearData = ChineseYearCache.shared.get(relatedIso: relatedIso, variant: V.self)
+        let packed = packedYear(relatedIso)
 
-        let ordinalMonth = try resolveOrdinalMonth(yearData: yearData, month: month)
-        let maxDay = yearData.monthLength(ordinalMonth)
+        let ordinalMonth = try resolveOrdinalMonth(packed: packed, month: month)
+        let maxDay = packed.monthLength(ordinalMonth)
         guard day >= 1, day <= maxDay else { throw DateNewError.invalidDay(max: maxDay) }
 
-        return ChineseDateInner(relatedIso: relatedIso, ordinalMonth: ordinalMonth, day: day)
+        return ChineseDateInner(relatedIso: relatedIso, ordinalMonth: ordinalMonth, day: day, packed: packed)
     }
 
     public func toRataDie(_ date: ChineseDateInner) -> RataDie {
-        let yearData = ChineseYearCache.shared.get(relatedIso: date.relatedIso, variant: V.self)
-        return yearData.newYear + Int64(yearData.daysBeforeMonth(date.ordinalMonth)) + Int64(date.day - 1)
+        let ny = date.packed.newYear(relatedIso: date.relatedIso)
+        return ny + Int64(date.packed.daysBeforeMonth(date.ordinalMonth)) + Int64(date.day - 1)
     }
 
     public func fromRataDie(_ rd: RataDie) -> ChineseDateInner {
-        // Approximate the related ISO year
         let isoYear = GregorianArithmetic.yearFromFixed(rd)
-        // Chinese new year is typically in Jan-Feb, so the Chinese year for a date
-        // in Jan might be the previous ISO year
         var relatedIso = isoYear
-        var yearData = ChineseYearCache.shared.get(relatedIso: relatedIso, variant: V.self)
+        var packed = packedYear(relatedIso)
+        var ny = packed.newYear(relatedIso: relatedIso)
 
         // Adjust if rd is before this year's new year
-        if rd < yearData.newYear {
+        if rd.dayNumber < ny.dayNumber {
             relatedIso -= 1
-            yearData = ChineseYearCache.shared.get(relatedIso: relatedIso, variant: V.self)
+            packed = packedYear(relatedIso)
+            ny = packed.newYear(relatedIso: relatedIso)
         }
 
         // Check if it's actually in the next year
-        let nextYearData = ChineseYearCache.shared.get(relatedIso: relatedIso + 1, variant: V.self)
-        if rd >= nextYearData.newYear {
+        let nextPacked = packedYear(relatedIso + 1)
+        let nextNY = nextPacked.newYear(relatedIso: relatedIso + 1)
+        if rd.dayNumber >= nextNY.dayNumber {
             relatedIso += 1
-            yearData = nextYearData
+            packed = nextPacked
+            ny = nextNY
         }
 
-        let dayOfYear = Int(rd.dayNumber - yearData.newYear.dayNumber)
-        let (ordinalMonth, day) = yearData.monthAndDay(dayOfYear: dayOfYear)
+        let dayOfYear = Int(rd.dayNumber - ny.dayNumber)
+        let (ordinalMonth, day) = packed.monthAndDay(dayOfYear: dayOfYear)
 
-        return ChineseDateInner(relatedIso: relatedIso, ordinalMonth: ordinalMonth, day: day)
+        return ChineseDateInner(relatedIso: relatedIso, ordinalMonth: ordinalMonth, day: day, packed: packed)
     }
 
     public func yearInfo(_ date: ChineseDateInner) -> YearInfo {
@@ -119,8 +120,7 @@ public struct ChineseCalendar<V: EastAsianVariant>: CalendarProtocol, Sendable {
     }
 
     public func monthInfo(_ date: ChineseDateInner) -> MonthInfo {
-        let yearData = ChineseYearCache.shared.get(relatedIso: date.relatedIso, variant: V.self)
-        let (number, isLeap) = yearData.monthCode(ordinal: date.ordinalMonth)
+        let (number, isLeap) = date.packed.monthCode(ordinal: date.ordinalMonth)
         let month = isLeap ? Month.leap(number) : Month.new(number)
         return MonthInfo(ordinal: date.ordinalMonth, month: month)
     }
@@ -128,28 +128,34 @@ public struct ChineseCalendar<V: EastAsianVariant>: CalendarProtocol, Sendable {
     public func dayOfMonth(_ date: ChineseDateInner) -> UInt8 { date.day }
 
     public func dayOfYear(_ date: ChineseDateInner) -> UInt16 {
-        let yearData = ChineseYearCache.shared.get(relatedIso: date.relatedIso, variant: V.self)
-        return UInt16(yearData.daysBeforeMonth(date.ordinalMonth)) + UInt16(date.day)
+        date.packed.daysBeforeMonth(date.ordinalMonth) + UInt16(date.day)
     }
 
     public func daysInMonth(_ date: ChineseDateInner) -> UInt8 {
-        let yearData = ChineseYearCache.shared.get(relatedIso: date.relatedIso, variant: V.self)
-        return yearData.monthLength(date.ordinalMonth)
+        date.packed.monthLength(date.ordinalMonth)
     }
 
     public func daysInYear(_ date: ChineseDateInner) -> UInt16 {
-        let yearData = ChineseYearCache.shared.get(relatedIso: date.relatedIso, variant: V.self)
-        return yearData.totalDays
+        date.packed.totalDays
     }
 
     public func monthsInYear(_ date: ChineseDateInner) -> UInt8 {
-        let yearData = ChineseYearCache.shared.get(relatedIso: date.relatedIso, variant: V.self)
-        return yearData.monthCount
+        date.packed.monthCount
     }
 
     public func isInLeapYear(_ date: ChineseDateInner) -> Bool {
-        let yearData = ChineseYearCache.shared.get(relatedIso: date.relatedIso, variant: V.self)
-        return yearData.leapMonth != nil
+        date.packed.leapMonth != nil
+    }
+
+    // MARK: - Year Data Resolution
+
+    /// Get packed year data: table lookup for 1901–2099, Moshier fallback otherwise.
+    private func packedYear(_ relatedIso: Int32) -> PackedChineseYearData {
+        if let p = ChineseYearTable.lookup(relatedIso) {
+            return p
+        }
+        let yd = ChineseYearCache.shared.get(relatedIso: relatedIso, variant: V.self)
+        return PackedChineseYearData.from(yearData: yd, relatedIso: relatedIso)
     }
 
     // MARK: - Private
@@ -161,21 +167,20 @@ public struct ChineseCalendar<V: EastAsianVariant>: CalendarProtocol, Sendable {
         }
     }
 
-    private func resolveOrdinalMonth(yearData: ChineseYearData, month: Month) throws -> UInt8 {
-        let leapMonth = yearData.leapMonth ?? 255
+    private func resolveOrdinalMonth(packed: PackedChineseYearData, month: Month) throws -> UInt8 {
+        let leapMonth = packed.leapMonth ?? 255
 
         if month.isLeap {
             guard month.number == leapMonth else {
                 throw DateNewError.monthNotInYear
             }
-            return leapMonth + 1  // Leap month follows the regular month
+            return leapMonth + 1
         }
 
         let num = month.number
         guard num >= 1, num <= 12 else { throw DateNewError.monthNotInCalendar }
 
-        // Ordinal month: if there's a leap month before this month, shift by 1
-        if let lm = yearData.leapMonth, num > lm {
+        if let lm = packed.leapMonth, num > lm {
             return num + 1
         }
         return num
@@ -185,6 +190,9 @@ public struct ChineseCalendar<V: EastAsianVariant>: CalendarProtocol, Sendable {
 // MARK: - ChineseDateInner
 
 /// Internal date representation for Chinese/Korean calendars.
+///
+/// Carries packed year data so that field accessors and arithmetic never
+/// need a cache lookup or astronomical calculation.
 public struct ChineseDateInner: Equatable, Comparable, Hashable, Sendable {
     /// The related ISO year (approximate Gregorian year).
     let relatedIso: Int32
@@ -192,11 +200,24 @@ public struct ChineseDateInner: Equatable, Comparable, Hashable, Sendable {
     let ordinalMonth: UInt8
     /// Day of the month (1-30).
     let day: UInt8
+    /// Packed year data (month lengths, leap month, new year offset).
+    let packed: PackedChineseYearData
 
     public static func < (lhs: ChineseDateInner, rhs: ChineseDateInner) -> Bool {
         if lhs.relatedIso != rhs.relatedIso { return lhs.relatedIso < rhs.relatedIso }
         if lhs.ordinalMonth != rhs.ordinalMonth { return lhs.ordinalMonth < rhs.ordinalMonth }
         return lhs.day < rhs.day
+    }
+
+    // Equatable/Hashable: only compare date fields, not packed data
+    public static func == (lhs: ChineseDateInner, rhs: ChineseDateInner) -> Bool {
+        lhs.relatedIso == rhs.relatedIso && lhs.ordinalMonth == rhs.ordinalMonth && lhs.day == rhs.day
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(relatedIso)
+        hasher.combine(ordinalMonth)
+        hasher.combine(day)
     }
 }
 

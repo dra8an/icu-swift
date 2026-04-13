@@ -48,16 +48,14 @@ conversion; no further perf work warranted.
 See **[`BakedDataStrategy.md`](BakedDataStrategy.md)** for the full
 analysis and prioritized action plan, informed by ICU4X contributor input.
 
-**Summary of the 5 actions (in priority order):**
+**Summary of the 5 actions:**
 
-1. **Bake Chinese year data for 1900–2100** — use HKO-validated CSV to
-   generate a const Swift array (~200 entries). Eliminates all Moshier
-   calls for common dates. 600 ms → 0 ms.
-2. **Pack `ChineseYearData` into a fixed-size value type** — replace
-   `[Bool]` heap alloc with a UInt16 bitmask + UInt8 offset + UInt8 leap.
-3. **Bake Dangi year data** — same format, KASI-sourced.
+1. ✅ **Bake Chinese year data** — 199 entries (1901–2099) from HKO. Done.
+2. ✅ **Pack `ChineseYearData`** — `PackedChineseYearData` (UInt32), stored
+   in `ChineseDateInner`. Lock-free field access. Done.
+3. **Bake Dangi year data** — same format, KASI-sourced. Deferred.
 4. **Profile and consider caching for Hindu calendars.**
-5. **Future: Umm al-Qura with baked data** (if/when implemented).
+5. ✅ **Umm al-Qura with baked data** — 301 entries (1300–1600 AH). Done.
 
 ## After Astronomical Perf Work
 

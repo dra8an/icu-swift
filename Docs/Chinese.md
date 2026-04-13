@@ -100,7 +100,42 @@ An earlier fix (2026-04-01) had resolved the 2023 M02L case by switching from a 
 
 ## Performance
 
-Computing a Chinese year requires ~15 new moon calculations via the Moshier engine (~600ms). A `ChineseYearCache` (LRU, 8 entries, `os_unfair_lock`) avoids recomputation for consecutive dates in the same year:
+### Baked Year Data (1901–2099)
+
+For dates in the common range, the Chinese calendar uses a **199-entry baked
+data table** (`ChineseYearTable`) generated from Hong Kong Observatory
+authoritative data. No astronomical calculations are performed — all year
+structure queries reduce to array index + bit manipulation.
+
+Each year is packed into a **4-byte `PackedChineseYearData`** (UInt32):
+
+```
+Bits  0-12: month lengths for up to 13 months (1 = 30 days, 0 = 29 days)
+Bits 13-16: leap month ordinal (0 = no leap, 2-13 = ordinal position)
+Bits 17-22: new year offset from January 19 of the related ISO year
+```
+
+The packed data is **stored in `ChineseDateInner`** alongside the
+year/month/day fields. This means every field accessor (`daysInMonth`,
+`monthsInYear`, `isInLeapYear`, `monthInfo`, etc.) and all date arithmetic
+operations read directly from the date — no cache lookup, no lock, no
+computation.
+
+| Operation (1901–2099) | Before (Moshier) | After (baked table) |
+|---|------:|------:|
+| Single date construction | ~586 ms | **< 0.001 ms** |
+| Field access (daysInMonth, etc.) | cache + lock | **inline bit ops** |
+| Date arithmetic (add/until) | cache + lock per step | **inline bit ops per step** |
+
+### Moshier Fallback (outside 1901–2099)
+
+Dates before 1901 or after 2099 fall through to the Moshier astronomical
+engine via `ChineseYearCache` (LRU-8, `os_unfair_lock`). The computed
+`ChineseYearData` is packed into `PackedChineseYearData` on the fly, so the
+date still carries its year data and field accessors remain lock-free after
+construction.
+
+Historical cache-only performance (before baked table, all dates):
 
 | Operation | Without cache | With cache | Speedup |
 |-----------|------:|------:|------:|

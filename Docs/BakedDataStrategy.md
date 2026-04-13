@@ -114,60 +114,37 @@ Performance has not been profiled in detail.
 
 ## Gap Analysis
 
-| Area | ICU4X | icu4swift | Gap |
+| Area | ICU4X | icu4swift | Status |
 |---|---|---|---|
-| Chinese year packing | 3 bytes packed | `[Bool]` + RataDie + Optional | Heap alloc, 10× larger |
-| Chinese baked data | 191+12 entries | None | **600 ms → 0 ms** for common range |
-| Dangi baked data | 191 entries | None | Same gap as Chinese |
-| Chinese cache | Per-instance | Global LRU-8 | Minor (functional, not optimal) |
-| Islamic Umm al-Qura | 2-byte packed + baked | Not implemented | Future work |
+| Chinese year packing | 3 bytes packed | `PackedChineseYearData` (UInt32) | ✅ Done (2026-04-13) |
+| Chinese baked data | 191+12 entries | 199 entries (1901–2099) | ✅ Done — HKO-sourced |
+| Chinese date carries year data | YearInfo in date | `packed` field in `ChineseDateInner` | ✅ Done — lock-free accessors |
+| Dangi baked data | 191 entries | Uses Chinese table + Moshier fallback | Deferred |
+| Islamic Umm al-Qura | 2-byte packed + baked | 301 entries (1300–1600 AH) | ✅ Done (2026-04-10) |
 | Hindu caching | No caching | No caching | Parity (both slow) |
 
 ## Recommended Actions — Prioritized
 
-### 1. Bake Chinese year data for 1900–2100 (highest impact)
+### 1. ✅ Bake Chinese year data (DONE — 2026-04-13)
 
-**Impact:** Eliminates ~100% of real-world Moshier calls for Chinese dates.
-Cold-start drops from ~600 ms to ~0 ms (table lookup).
+**Result:** 199-entry `ChineseYearTable` covering 1901–2099, generated from
+HKO data. `PackedChineseYearData` (UInt32) encodes month lengths (13 bits),
+leap month ordinal (4 bits), and new-year offset from Jan 19 (6 bits).
 
-**Approach:**
-- We already have HKO-validated data in `chinese_months_1901_2100_hko.csv`
-  (2,461 month rows across 200 years). This was validated against the Hong
-  Kong Observatory and our own Moshier engine agrees on 2,458/2,461 of them.
-- Write a one-time code generator that reads the CSV and emits a Swift
-  `static let` array of packed year entries.
-- Each entry needs: new-year offset from Jan 19, 13-bit month-length mask,
-  4-bit leap month ordinal. ICU4X fits this in 3 bytes; we can use a
-  `UInt32` for simplicity.
-- At runtime: `ChineseYearData.compute()` first checks the table. On hit,
-  unpack and return. On miss (outside 1900–2100), fall through to Moshier.
+`ChineseDateInner` now carries its `packed: PackedChineseYearData` field.
+All field accessors and arithmetic read from it directly — no cache, no
+lock. Moshier fallback remains for dates outside 1901–2099 via
+`ChineseYearCache`.
 
-**Data we need per year:**
-1. New Year day-of-year offset from a fixed anchor (e.g. January 19)
-2. Which months are 29 vs 30 days (13-bit bitmask)
-3. Which month is the leap month (0 = none, else ordinal 1-13)
+Cold start: **~586 ms → < 0.001 ms** for 1901–2099 dates.
 
-All of this is derivable from the HKO CSV + our existing `ChineseYearData`
-computation for the 3 years where we differ from HKO.
+### 2. ✅ Pack `ChineseYearData` (DONE — merged with #1)
 
-**Risk:** The 3 years where Moshier disagrees with HKO (1906 cluster). We
-should bake the HKO values for those years (HKO is authoritative), and use
-Moshier values only outside the baked range.
-
-### 2. Pack `ChineseYearData` into a fixed-size value type
-
-**Impact:** Smaller cache footprint, eliminates `[Bool]` heap allocation,
-enables direct storage in the baked table.
-
-**Approach:**
-- Replace `[Bool]` with a `UInt16` bitmask (13 bits for month lengths).
-- Replace the separate `newYear: RataDie` with a `UInt8` offset from a
-  known anchor (January 19 of the related ISO year — Chinese New Year always
-  falls between Jan 21 and Feb 20).
-- Store `leapMonth` as a `UInt8` (0 = no leap).
-- Total: 4 bytes (UInt16 mask + UInt8 offset + UInt8 leap) or 3 bytes
-  if we pack tighter.
-- This type becomes both the cache entry and the baked-table entry.
+`PackedChineseYearData` is the packed type. It serves as both the baked
+table entry and the field stored in `ChineseDateInner`. Computed
+`ChineseYearData` (from Moshier) is packed on the fly via
+`PackedChineseYearData.from(yearData:relatedIso:)` for dates outside the
+baked range.
 
 ### 3. Bake Dangi year data for 1900–2100
 
