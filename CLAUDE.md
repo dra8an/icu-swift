@@ -8,7 +8,7 @@ icu4swift is a type-safe Swift calendar library porting algorithms from ICU4X (R
 
 ```bash
 swift build              # Build all targets
-swift test -c release    # Run all 283 tests (~30 seconds in release mode)
+swift test -c release    # Run all 319 tests (~28 seconds in release mode)
 ```
 
 No external dependencies. Swift 6.0, strict concurrency enabled.

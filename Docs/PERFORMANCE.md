@@ -6,7 +6,7 @@
 
 **Always use release mode for tests:**
 ```bash
-swift test -c release    # ~27 seconds for full suite (298 tests)
+swift test -c release    # ~28 seconds for full suite (319 tests)
 swift test               # ~2+ minutes (debug mode, 50x slower for Moshier calculations)
 ```
 
@@ -16,11 +16,47 @@ The Moshier VSOP87/DE404 ephemeris calculations are compute-heavy (135 harmonic 
 
 | Test Suite | Release | Debug | Notes |
 |-----------|-------:|------:|-------|
-| Full suite (298 tests) | **27s** | ~140s | |
+| Full suite (319 tests) | **28s** | ~140s | |
 | Hindu lunisolar (55,152 days) | **27s** | ~120s | Dominates total time |
 | Hindu solar (4×1,811 months) | **3s** | ~60s | Per calendar ~1s |
 | Chinese calendar (730-day round-trip) | **1s** | ~4s | With year cache |
 | All other calendars | **<1s** | ~2s | Arithmetic only |
+
+## Per-Calendar Benchmark Baseline
+
+*Measured 2026-04-13, release mode, x86_64. Each calendar converts 1,000
+consecutive Gregorian days (2024-01-01 onward) to the target calendar and
+back. Hindu uses 100 dates due to higher per-date cost.*
+
+Run with: `swift test -c release --filter "Benchmark"`
+
+| Calendar | µs/date | Category |
+|---|---:|---|
+| ISO | 1.9 | arithmetic |
+| Buddhist | 1.9 | arithmetic |
+| ROC | 2.1 | arithmetic |
+| Gregorian | 2.1 | arithmetic |
+| Japanese | 2.1 | arithmetic |
+| Persian | 2.1 | arithmetic |
+| Indian | 2.1 | arithmetic |
+| Julian | 2.2 | arithmetic |
+| Chinese (baked) | 2.2 | table lookup |
+| Islamic Umm al-Qura | 2.3 | table lookup |
+| Ethiopian | 2.4 | arithmetic |
+| Islamic Civil | 2.5 | arithmetic |
+| Islamic Tabular | 2.5 | arithmetic |
+| Coptic | 2.7 | arithmetic |
+| Hebrew | 3.5 | arithmetic |
+| Dangi (baked) | 3.6 | table lookup |
+| Chinese (Moshier) | 437 | astronomical fallback |
+| Bengali (solar) | 819 | astronomical |
+| Tamil (solar) | 1,334 | astronomical |
+| Purnimanta (lunisolar) | 3,847 | astronomical |
+| Amanta (lunisolar) | 3,880 | astronomical |
+
+All arithmetic and table-lookup calendars are **< 4 µs/date** — effectively
+equivalent. The astronomical calendars (Hindu, Chinese Moshier fallback) are
+200–2000× slower, dominated by Moshier VSOP87 ephemeris evaluations.
 
 ## Lazy Field Computation
 

@@ -1,5 +1,10 @@
 # Islamic Tabular Calendar
 
+> **Superseded:** This doc covers the initial Phase 4b implementation.
+> For the current design (Tabular + Civil + Umm al-Qura, configurable epoch,
+> baked data), see [`Islamic.md`](Islamic.md) and
+> [`Islamic_reference.md`](Islamic_reference.md).
+
 *Implemented: 2026-03-30 | Phase 4b | Target: CalendarAstronomical*
 
 ## Overview

@@ -4,7 +4,7 @@
 
 ## Current State
 
-22 of 22 calendars implemented (Islamic Civil added 2026-04-08). Hindu calendars at 100% accuracy (55,152 lunisolar days + 4×1,811 solar months). 283 tests passing in ~30 seconds (release mode).
+23 calendars implemented (Islamic Umm al-Qura added 2026-04-10). Hindu calendars at 100% accuracy (55,152 lunisolar days + 4×1,811 solar months). 319 tests passing in ~28 seconds (release mode).
 
 See [`TestCoverageAndDocs.md`](TestCoverageAndDocs.md) for the master per-calendar index of docs and regression coverage.
 

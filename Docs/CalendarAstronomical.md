@@ -1,15 +1,17 @@
 # CalendarAstronomical — Phase 4b Overview
 
-*Completed: 2026-04-01*
+*Completed: 2026-04-01 | Updated: 2026-04-13*
 
 ## Overview
 
-Phase 4b implements three calendar systems in the `CalendarAstronomical` target. Each has its own detailed document:
+Phase 4b implements six calendar systems in the `CalendarAstronomical` target. Each has its own detailed document:
 
 | Calendar | Type | Document |
 |----------|------|----------|
-| [Islamic Tabular](IslamicTabular.md) | Arithmetic (30-year cycle) | Eras `ah`/`bh`, 354/355 days |
-| [Chinese](Chinese.md) | Lunisolar (astronomical) | Winter solstice + new moons + zhōngqì |
+| [Islamic Tabular](Islamic.md) | Arithmetic (Thursday epoch) | `islamic-tbla`, configurable `TabularEpoch` |
+| [Islamic Civil](Islamic.md) | Arithmetic (Friday epoch) | `islamic-civil`, facade over tabular |
+| [Islamic Umm al-Qura](Islamic.md) | Baked data (KACST) | `islamic-umalqura`, 301-entry table (1300–1600 AH) |
+| [Chinese](Chinese.md) | Lunisolar (baked + astronomical) | 199-entry table (1901–2099), Moshier fallback |
 | [Dangi (Korean)](Dangi.md) | Lunisolar (astronomical) | Same as Chinese, UTC+9 (Seoul) |
 
 ## Architecture
