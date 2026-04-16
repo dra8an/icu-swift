@@ -235,7 +235,18 @@ public struct HinduSolar<V: HinduSolarVariant>: CalendarProtocol, Sendable {
         return HinduSolarDateInner(year: extYear, month: month.number, day: day)
     }
 
+    /// The regional month at which the year begins chronologically.
+    private var yearStartMonth: UInt8 {
+        UInt8(((V.yearStartRashi - V.firstRashi + 12) % 12) + 1)
+    }
+
     public func toRataDie(_ date: HinduSolarDateInner) -> RataDie {
+        // Try baked table first
+        if let packed = HinduSolarYearTable.lookup(V.self, solarYear: date.year) {
+            let ysm = yearStartMonth
+            return packed.newYear + Int64(packed.daysBeforeMonth(date.month, yearStartMonth: ysm)) + Int64(date.day - 1)
+        }
+        // Moshier fallback
         let jdStart = HinduSolarArithmetic.solarMonthStart(
             month: Int(date.month), year: Int(date.year), variant: V.self, loc: loc, engine: engine
         )
@@ -243,6 +254,23 @@ public struct HinduSolar<V: HinduSolarVariant>: CalendarProtocol, Sendable {
     }
 
     public func fromRataDie(_ rd: RataDie) -> HinduSolarDateInner {
+        // Estimate the solar year from the Gregorian year
+        let isoYear = GregorianArithmetic.yearFromFixed(rd)
+        let ysm = yearStartMonth
+
+        // Try baked table — check candidate years around the estimate
+        for offset: Int32 in [0, -1, 1, -2, 2] {
+            let candidateYear = isoYear - Int32(V.gyOffsetOn) + offset
+            if let packed = HinduSolarYearTable.lookup(V.self, solarYear: candidateYear) {
+                let endRD = packed.newYear.dayNumber + Int64(packed.totalDays)
+                if rd.dayNumber >= packed.newYear.dayNumber && rd.dayNumber < endRD {
+                    let (month, day) = packed.monthAndDay(rd: rd, yearStartMonth: ysm)
+                    return HinduSolarDateInner(year: candidateYear, month: month, day: day)
+                }
+            }
+        }
+
+        // Moshier fallback
         let jd = JulianDayHelper.rdToJd(rd)
         let result = HinduSolarArithmetic.gregorianToSolar(
             jd: jd, loc: loc, variant: V.self, engine: engine
@@ -266,7 +294,9 @@ public struct HinduSolar<V: HinduSolarVariant>: CalendarProtocol, Sendable {
     public func dayOfMonth(_ date: HinduSolarDateInner) -> UInt8 { date.day }
 
     public func dayOfYear(_ date: HinduSolarDateInner) -> UInt16 {
-        // Sum days in months before this one
+        if let packed = HinduSolarYearTable.lookup(V.self, solarYear: date.year) {
+            return packed.daysBeforeMonth(date.month, yearStartMonth: yearStartMonth) + UInt16(date.day)
+        }
         var total: UInt16 = 0
         for m in 1..<Int(date.month) {
             total += UInt16(HinduSolarArithmetic.solarMonthLength(
@@ -277,12 +307,18 @@ public struct HinduSolar<V: HinduSolarVariant>: CalendarProtocol, Sendable {
     }
 
     public func daysInMonth(_ date: HinduSolarDateInner) -> UInt8 {
-        UInt8(HinduSolarArithmetic.solarMonthLength(
+        if let packed = HinduSolarYearTable.lookup(V.self, solarYear: date.year) {
+            return packed.monthLength(date.month)
+        }
+        return UInt8(HinduSolarArithmetic.solarMonthLength(
             month: Int(date.month), year: Int(date.year), variant: V.self, loc: loc, engine: engine
         ))
     }
 
     public func daysInYear(_ date: HinduSolarDateInner) -> UInt16 {
+        if let packed = HinduSolarYearTable.lookup(V.self, solarYear: date.year) {
+            return packed.totalDays
+        }
         var total: UInt16 = 0
         for m in 1...12 {
             total += UInt16(HinduSolarArithmetic.solarMonthLength(

@@ -121,7 +121,8 @@ Performance has not been profiled in detail.
 | Chinese date carries year data | YearInfo in date | `packed` field in `ChineseDateInner` | ✅ Done — lock-free accessors |
 | Dangi baked data | 191 entries | Uses Chinese table + Moshier fallback | Deferred |
 | Islamic Umm al-Qura | 2-byte packed + baked | 301 entries (1300–1600 AH) | ✅ Done (2026-04-10) |
-| Hindu caching | No caching | No caching | Parity (both slow) |
+| Hindu solar baked | Not done | 4×150 entries (~1900–2050) | ✅ Done (2026-04-16) |
+| Hindu lunisolar caching | No caching | No caching | Not attempted (complex structure) |
 
 ## Recommended Actions — Prioritized
 

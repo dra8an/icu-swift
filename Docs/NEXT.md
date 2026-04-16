@@ -48,14 +48,17 @@ conversion; no further perf work warranted.
 See **[`BakedDataStrategy.md`](BakedDataStrategy.md)** for the full
 analysis and prioritized action plan, informed by ICU4X contributor input.
 
-**Summary of the 5 actions:**
+**Summary of the actions:**
 
 1. ✅ **Bake Chinese year data** — 199 entries (1901–2099) from HKO. Done.
 2. ✅ **Pack `ChineseYearData`** — `PackedChineseYearData` (UInt32), stored
    in `ChineseDateInner`. Lock-free field access. Done.
 3. **Bake Dangi year data** — same format, KASI-sourced. Deferred.
-4. **Profile and consider caching for Hindu calendars.**
+4. ✅ **Bake Hindu solar calendars** — 4×150 entries (1900–2050), ~500×
+   speedup. Done (2026-04-16).
 5. ✅ **Umm al-Qura with baked data** — 301 entries (1300–1600 AH). Done.
+6. **Hindu lunisolar baking** — deferred; complex year structure (adhika
+   masa, kshaya tithi) makes packing harder.
 
 ## After Astronomical Perf Work
 

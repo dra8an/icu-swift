@@ -39,6 +39,12 @@ struct HinduBenchmarks {
     @Test("Benchmark: Hindu Bengali (solar)")
     func benchBengali() { benchmark(HinduBengali(), label: "Bengali") }
 
+    @Test("Benchmark: Hindu Odia (solar)")
+    func benchOdia() { benchmark(HinduOdia(), label: "Odia") }
+
+    @Test("Benchmark: Hindu Malayalam (solar)")
+    func benchMalayalam() { benchmark(HinduMalayalam(), label: "Malayalam") }
+
     @Test("Benchmark: Hindu Amanta (lunisolar)")
     func benchAmanta() { benchmark(HinduAmanta(), label: "Amanta", allowKshaya: true) }
 

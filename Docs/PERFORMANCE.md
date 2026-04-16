@@ -42,6 +42,10 @@ Run with: `swift test -c release --filter "Benchmark"`
 | Julian | 2.2 | arithmetic |
 | Chinese (baked) | 2.2 | table lookup |
 | Islamic Umm al-Qura | 2.3 | table lookup |
+| Hindu Tamil (baked) | 2.4 | table lookup |
+| Hindu Bengali (baked) | 2.5 | table lookup |
+| Hindu Odia (baked) | 2.5 | table lookup |
+| Hindu Malayalam (baked) | 2.7 | table lookup |
 | Ethiopian | 2.4 | arithmetic |
 | Islamic Civil | 2.5 | arithmetic |
 | Islamic Tabular | 2.5 | arithmetic |
@@ -49,8 +53,6 @@ Run with: `swift test -c release --filter "Benchmark"`
 | Hebrew | 3.5 | arithmetic |
 | Dangi (baked) | 3.6 | table lookup |
 | Chinese (Moshier) | 437 | astronomical fallback |
-| Bengali (solar) | 819 | astronomical |
-| Tamil (solar) | 1,334 | astronomical |
 | Purnimanta (lunisolar) | 3,847 | astronomical |
 | Amanta (lunisolar) | 3,880 | astronomical |
 
@@ -184,11 +186,16 @@ astronomy is 2.8 MB.
 |---|---:|---:|---:|
 | Chinese (HKO, 1901–2099) | 199 | 4 bytes (UInt32) | 796 bytes |
 | Umm al-Qura (KACST, 1300–1600 AH) | 301 | 2 bytes (UInt16) | 602 bytes |
-| **Total** | | | **1,398 bytes** |
+| Hindu Tamil (1822–1971 Saka) | 150 | 8 bytes (UInt32 + Int32) | 1,200 bytes |
+| Hindu Bengali (1307–1456) | 150 | 8 bytes | 1,200 bytes |
+| Hindu Odia (1308–1457) | 150 | 8 bytes | 1,200 bytes |
+| Hindu Malayalam (1076–1225) | 150 | 8 bytes | 1,200 bytes |
+| **Total** | | | **6,198 bytes** (~6 KB) |
 
-The baked tables add **1.4 KB** — 0.3% of CalendarAstronomical, 0.05% of
-the full library. The payoff: eliminating ~600ms of Moshier computation per
-Chinese date and providing instant Umm al-Qura lookups.
+The baked tables add **~6 KB** — 1.4% of the relevant modules, 0.2% of
+the full library. The payoff: eliminating all Moshier astronomical
+calculations for the most common date range, with speedups ranging from
+200× (Chinese) to 500× (Hindu solar).
 
 ### Source Code
 
