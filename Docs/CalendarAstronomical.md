@@ -1,6 +1,6 @@
 # CalendarAstronomical — Phase 4b Overview
 
-*Completed: 2026-04-01 | Updated: 2026-04-13*
+*Completed: 2026-04-01 | Updated: 2026-04-16*
 
 ## Overview
 
@@ -35,8 +35,16 @@ The Chinese calendar leap month detection required matching ICU4X's **forward co
 
 | File | What |
 |------|------|
-| `IslamicTabular.swift` | Islamic Tabular calendar + arithmetic |
+| `IslamicTabular.swift` | Islamic Tabular + Civil + `TabularEpoch` enum |
+| `IslamicUmmAlQura.swift` | UQ calendar + `PackedHijriYearData` + 301-entry KACST table |
 | `ChineseCalendar.swift` | `EastAsianVariant` protocol, `China`/`Korea` variants, `ChineseCalendar<V>`, `ChineseYearData`, `ChineseYearCache` |
+| `PackedChineseYear.swift` | `PackedChineseYearData` + 199-entry HKO baked table |
+
+## Baked data
+
+- **Chinese:** `ChineseYearTable` — 199 entries × 4 bytes (UInt32) = 796 bytes. Fields: 13-bit month lengths, 4-bit leap month ordinal, 6-bit new-year offset from Jan 19.
+- **Umm al-Qura:** `UmmAlQuraData` — 301 entries × 2 bytes (UInt16) = 602 bytes. Fields: 12-bit month lengths, sign bit, 3-bit offset from mean tabular start.
+- **Dangi:** no baked table yet — uses Moshier at Seoul longitude. See `Docs/NEXT.md`.
 
 ## Dependencies
 
@@ -49,4 +57,4 @@ CalendarAstronomical
 
 ## Test Coverage
 
-32 tests total. See individual calendar documents for details.
+57 tests across 5 calendars. See individual calendar documents and `Docs/TestCoverageAndDocs.md`.

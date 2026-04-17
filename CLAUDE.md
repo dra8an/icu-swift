@@ -8,7 +8,7 @@ icu4swift is a type-safe Swift calendar library porting algorithms from ICU4X (R
 
 ```bash
 swift build              # Build all targets
-swift test -c release    # Run all 319 tests (~28 seconds in release mode)
+swift test -c release    # Run all 321 tests (~28 seconds in release mode)
 ```
 
 No external dependencies. Swift 6.0, strict concurrency enabled.
@@ -55,6 +55,10 @@ Docs/                    # Architecture analysis and implementation plan
 - **CalendarAstronomical** depends on CalendarCore, CalendarSimple, and AstronomicalEngine. Chinese calendar uses a **199-entry baked data table** (`ChineseYearTable`) for 1901–2099, generated from HKO data. Each year is packed into a `PackedChineseYearData` (UInt32: 13-bit month lengths + 4-bit leap month + 6-bit new-year offset). The packed data is **stored in `ChineseDateInner`**, so all field accessors and arithmetic are lock-free bit ops. Outside 1901–2099, falls back to Moshier via `ChineseYearCache` (LRU-8). `ChineseYearData.compute` uses a `findNewYear` helper called for both the current and next Chinese year, then iterates exactly 12 months between them and applies the "13th month is leap if no leap detected" fallback (matching ICU4X's `month_structure_for_year`). Chinese calendar validates against authoritative Hong Kong Observatory data — see `Docs/Chinese_reference.md`.
 - **Islamic Tabular & Civil** are two CLDR calendars sharing one arithmetic implementation (`IslamicTabularArithmetic`, epoch-parameterized). `IslamicTabular` (identifier `islamic-tbla`) takes a `TabularEpoch` and defaults to `.thursday` (Jul 15, 622 Julian); `IslamicCivil` (identifier `islamic-civil`) is a separate calendar facade hard-coded to `.friday` (Jul 16, 622 Julian). Both share `IslamicTabularDateInner`. Validated daily 1900–2100 against two independent sources (Foundation and Python `convertdate`) — see `Docs/Islamic_reference.md`. The `yearFromFixed` formula must use ICU4X's exact `floor((30·diff + 10646) / 10631)` — the simpler `30·diff/10631 + 1` approximation is off-by-one at end-of-year boundaries.
 - **Islamic Umm al-Qura** (`islamic-umalqura`) is Saudi Arabia's official Hijri calendar, using observation-based month lengths from KACST. Uses a 301-entry baked data table (`PackedHijriYearData`, UInt16 per year) for 1300–1600 AH (~1882–2174 CE), falling back to Islamic Civil arithmetic outside that range. Data originates from KACST → ICU4C → ICU4X; offsets recomputed for our epoch using Foundation. Validated against official Saudi government dates and Foundation (4,380 / 0). See `Docs/Islamic.md`.
+
+## Session Handoff
+
+**Start here when resuming work:** `Docs/HANDOFF.md` — comprehensive current-state summary, recent big work, gotchas, file layout, deferred work, and resume checklist.
 
 ## Test Coverage and Per-Calendar Docs
 

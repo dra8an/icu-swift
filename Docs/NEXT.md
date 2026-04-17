@@ -1,70 +1,62 @@
 # icu4swift — Next Steps
 
-*Last updated: 2026-04-08*
+*Last updated: 2026-04-16*
 
 ## Current State
 
-23 calendars implemented (Islamic Umm al-Qura added 2026-04-10). Hindu calendars at 100% accuracy (55,152 lunisolar days + 4×1,811 solar months). 319 tests passing in ~28 seconds (release mode).
+23 calendars implemented. 321 tests passing in ~28 seconds (release mode). All calendars validated against external authoritative sources; Chinese has 3 known-limitation failures in the 1906 cluster (Moshier-vs-HKO physical disagreement).
 
-See [`TestCoverageAndDocs.md`](TestCoverageAndDocs.md) for the master per-calendar index of docs and regression coverage.
+**Performance:** all arithmetic and baked-table calendars at 2–4 µs/date. Only Hindu lunisolar remains in the slow tier at ~3,900 µs/date.
 
-## Chinese Calendar Investigation — Mostly Resolved
+See [`TestCoverageAndDocs.md`](TestCoverageAndDocs.md) for the master per-calendar index, [`PERFORMANCE.md`](PERFORMANCE.md) for benchmarks, and [`HANDOFF.md`](HANDOFF.md) for a full session-handoff summary.
 
-**Status:** 3 regression failures remaining, down from 245. All 23 unit tests passing. See `Docs/Chinese_reference.md` for the authoritative data setup, and `backup/README.md` for snapshots of intermediate states.
+## Completed work
 
-### What we did
-1. **Switched the regression test from an ICU4X-derived CSV to authoritative Hong Kong Observatory data** (`Data/hko_raw/T{1901..2100}e.txt`, generator at `Data/build_hko_csv.py`, CSV at `Tests/CalendarAstronomicalTests/chinese_months_1901_2100_hko.csv`). The ICU4X-derived CSV had a generator off-by-one bug producing ~121 false alarms.
-2. **Fixed the `nm11` semantics** — was `newMoonOnOrAfter(solstice)`, should be `newMoonOnOrBefore(solstice)` (the 11th month is the lunation *containing* the solstice).
-3. **Restructured `ChineseYearData.compute` to use a `findNewYear` helper** for both the current and next Chinese year, then iterate exactly 12 months between them and apply the "13th month is leap if no leap detected" fallback (matching ICU4X's `month_structure_for_year`). This handles M11L-style leaps that fall in a different sui from the year being computed.
-4. **Two boundary-precision guards:** take the LAST same-term pair in the 12-iter loop (the real leap is later than any false positive), and only commit a leap if there's actually a 13th month.
-5. **Midnight epsilon snap** in `newMoonOnOrAfter`: when the local moment is within `1e-4` days (~8.6 s) past local midnight, snap to the previous day. Resolved 2057 M08→M09 (Moshier placed that new moon 3.5 seconds past midnight Beijing vs HKO's prior-day placement).
+### Chinese Calendar Investigation — Done
+3 regression failures (1906 cluster), accepted as Moshier-vs-HKO model disagreement. Moved from ICU4X-derived test data to HKO authoritative data; refactored `ChineseYearData.compute` with proper `findNewYear` logic, leap detection guards, and midnight epsilon snap. See `Docs/Chinese_reference.md`.
 
-### Remaining 3 failures (1 cluster)
-**1906 M03→M04 boundary.** Moshier places the April 1906 new moon at Apr 23 23:52:04 LMT — 8 minutes before midnight. HKO places it on Apr 24. This is an 8-minute discrepancy, too far to be a simple rounding issue, and in the opposite direction from the epsilon fix. Appears to be a real Moshier-vs-HKO astronomical model disagreement at the historical end of the table. Accepted as a known limitation; not worth further investigation unless we change engines.
+### Baked Data Architecture — Done
+Three calendar families now use packed year data stored in `DateInner`:
 
-## Performance — Astronomical Calendars
+1. ✅ **Chinese** — 199 entries (1901–2099), HKO-sourced, `PackedChineseYearData` UInt32. ~586 ms cold → 2.2 µs/date. (2026-04-13)
+2. ✅ **Islamic Umm al-Qura** — 301 entries (1300–1600 AH), KACST-sourced, `PackedHijriYearData` UInt16. Validated against official Saudi government dates. (2026-04-10)
+3. ✅ **Hindu solar ×4** — 150 entries each (~1900–2050), Moshier-sourced, `PackedHinduSolarYearData` (UInt32 months + UInt16 offset from per-variant base). ~500× speedup. (2026-04-16)
 
-The next major focus is **further optimization of astronomical calendars**.
-Arithmetic calendars are already sub-microsecond per conversion and are not
-a concern.
+**Total baked data: ~5 KB** (0.16% of library). See [`BakedDataStrategy.md`](BakedDataStrategy.md).
 
-### Astronomical (perf-sensitive) calendars
+### Regression Coverage — Done
+- Hebrew ×73,414 vs Hebcal
+- Islamic ×3 (Tabular, Civil, UQ) vs Foundation + convertdate
+- Persian, Coptic, Ethiopian, Indian (Saka) vs Foundation + convertdate
+- Japanese vs Foundation (era mapping)
+- Chinese vs Hong Kong Observatory
+- Hindu ×6 vs Moshier regression CSVs
 
-| Calendar | Engine path | Status |
-|---|---|---|
-| Chinese | Moshier + HybridEngine | ~586 ms uncached, ~644 ms cached, **39× speedup over 30 days** via `ChineseYearCache` (LRU 8) |
-| Dangi | Moshier + HybridEngine | Structurally identical to Chinese, no dedicated cache |
-| Hindu Amanta / Purnimanta (lunisolar) | AstronomicalEngine + sunrise/equinox | 100% accurate, perf not yet profiled |
-| Hindu Tamil / Bengali / Odia / Malayalam (solar) | Sun longitude only | 100% accurate, perf not yet profiled |
+## Deferred / Remaining Work
 
-### Arithmetic (no perf concern) — for reference
+### Performance optimization
 
-ISO, Gregorian, Julian, Buddhist, ROC, Coptic, Ethiopian, Persian, Hebrew,
-Indian, Japanese, Islamic Tabular, Islamic Civil. All sub-microsecond per
-conversion; no further perf work warranted.
+**Hindu lunisolar** is the last slow tier (~3,900 µs/date for Amanta, Purnimanta). Not yet profiled or baked.
 
-### Strategy — based on ICU4X design research
+- **Profile first** to identify hot spots (likely sunrise calculation and tithi boundary bisection).
+- **Baking is non-trivial** — year structure is complex (adhika masa inserts a 13th month, kshaya tithi skips days). Would require a new packing scheme beyond what Chinese/Hindu solar use.
+- **Alternative: per-date cache** — cache `(rd, tithi boundaries)` since consecutive dates often recompute the same sunrise/tithi pair.
+- **Impact:** unclear without profiling. Current 3,900 µs is fine for one-off conversions but slow for bulk date rendering.
 
-See **[`BakedDataStrategy.md`](BakedDataStrategy.md)** for the full
-analysis and prioritized action plan, informed by ICU4X contributor input.
+### Dangi (Korean) baked data — Deferred
 
-**Summary of the actions:**
+Dangi is structurally identical to Chinese but uses UTC+9 (Seoul) instead of UTC+8 (Beijing). Differences only appear at ~1-hour midnight boundaries. Currently falls through to Moshier for all dates.
 
-1. ✅ **Bake Chinese year data** — 199 entries (1901–2099) from HKO. Done.
-2. ✅ **Pack `ChineseYearData`** — `PackedChineseYearData` (UInt32), stored
-   in `ChineseDateInner`. Lock-free field access. Done.
-3. **Bake Dangi year data** — same format, KASI-sourced. Deferred.
-4. ✅ **Bake Hindu solar calendars** — 4×150 entries (1900–2050), ~500×
-   speedup. Done (2026-04-16).
-5. ✅ **Umm al-Qura with baked data** — 301 entries (1300–1600 AH). Done.
-6. **Hindu lunisolar baking** — deferred; complex year structure (adhika
-   masa, kshaya tithi) makes packing harder.
+**Source options:**
+- **KASI Open API** (Korea Astronomy and Space Science Institute) — per-date query, requires API key
+- **Python `korean_lunar_calendar_py`** — embeds KASI tables for 1000–2050 as lookup arrays
+- **Recompute from our Moshier engine** at the Seoul longitude
 
-## After Astronomical Perf Work
+**Status:** Low priority. Can be revisited if specific Dangi-vs-Chinese bugs surface. No governmental authoritative source comparable to HKO for Chinese.
 
-### 1. DateFormat (Phase 8) — Very Large complexity
+### Phase 8: DateFormat — Very Large
 
-**Depends on:** All calendar phases + Phase 7.
+**Depends on:** All calendar phases + Phase 7 (all done).
 
 **Deliverables:**
 - Semantic skeleton API (`YMD.long`, `YMDE.medium`)
@@ -74,7 +66,7 @@ analysis and prioritized action plan, informed by ICU4X contributor input.
 - `FormattedDate` with field parts
 - CLDR data embedding for core locale set
 
-**This is the largest single phase.** Consider breaking it into sub-phases:
+**Sub-phases:**
 1. Pattern engine (pattern parsing, field rendering)
 2. Skeleton matching (CLDR best-pattern algorithm)
 3. Data embedding (code-gen CLDR data for ~14 locales)
@@ -82,15 +74,22 @@ analysis and prioritized action plan, informed by ICU4X contributor input.
 
 **Source:** ICU4X `fieldsets.rs`, `pattern/`, `format/`. CLDR data.
 
-### 2. DateParse + DateFormatInterval (Phases 9-10)
+**Status:** Deferred — user explicitly said "Phase 8 will have to wait" (2026-04-08). Calendar work and performance optimization are the priority until user signals otherwise.
+
+### Phase 9-10: DateParse + DateFormatInterval
 
 **Depends on:** Phase 8.
 
 Can run in parallel with each other. Lower priority — formatting is more commonly needed than parsing.
 
-## Open Questions
+## Open Questions (for when DateFormat work starts)
 
 1. **CLDR data strategy:** Embed as generated Swift source? External files? Build-time code generation for locale subsetting?
 2. **AnyCalendar design:** Manual enum (exhaustive, fast) vs protocol existential (extensible, slower)?
 3. **Minimum locale set for v1:** en, ja, ar, he, hi, zh, ko, fa, th, de, fr, es, pt, ru covers all calendar systems. Is this enough?
-4. **Chinese calendar authority:** For post-1912 dates, should we trust our Moshier calculation (JPL-grade precision) or match ICU4X's Reingold-generated tables?
+
+## Lowest-Hanging Fruit (if you want something small)
+
+- **Benchmark Hindu lunisolar** under Instruments — identify whether sunrise or tithi bisection dominates. Even a 2× improvement would move it from 3,900 µs to ~2,000 µs.
+- **Chinese pre-1901 / post-2099** — HKO data doesn't extend; would need Qing-era recompute or accept the fallback. Probably not worth it for edge-of-range dates.
+- **Extend Hebrew regression** beyond 1900–2100 — Hebrew is pure arithmetic, so we could validate against Hebcal for ±10,000 years cheaply. Mostly diminishing returns since 0 failures across 73k days is strong evidence.

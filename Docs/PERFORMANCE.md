@@ -1,12 +1,12 @@
 # Performance
 
-*Last updated: 2026-04-13*
+*Last updated: 2026-04-16*
 
 ## Build Configuration
 
 **Always use release mode for tests:**
 ```bash
-swift test -c release    # ~28 seconds for full suite (319 tests)
+swift test -c release    # ~28 seconds for full suite (321 tests)
 swift test               # ~2+ minutes (debug mode, 50x slower for Moshier calculations)
 ```
 
@@ -16,7 +16,7 @@ The Moshier VSOP87/DE404 ephemeris calculations are compute-heavy (135 harmonic 
 
 | Test Suite | Release | Debug | Notes |
 |-----------|-------:|------:|-------|
-| Full suite (319 tests) | **28s** | ~140s | |
+| Full suite (321 tests) | **28s** | ~140s | |
 | Hindu lunisolar (55,152 days) | **27s** | ~120s | Dominates total time |
 | Hindu solar (4×1,811 months) | **3s** | ~60s | Per calendar ~1s |
 | Chinese calendar (730-day round-trip) | **1s** | ~4s | With year cache |
@@ -207,7 +207,7 @@ range 0–54,423 days across 150 years, fitting comfortably in UInt16
 | Category | Lines | Files |
 |---|---:|---:|
 | Source (all modules) | 8,583 | 45 |
-| Tests | 5,311 | 298 tests |
+| Tests | 5,311 | 321 tests |
 | Docs | 4,812 | 18 |
 | Test data (CSVs) | 244,512 | — |
 

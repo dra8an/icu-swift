@@ -1,6 +1,6 @@
 # Hindu Calendars — Phase 5
 
-*Completed: 2026-04-06 | Status: Done — 100% accuracy on all calendars*
+*Completed: 2026-04-06 | Solar baked tables: 2026-04-16 | Status: Done — 100% accuracy on all calendars*
 
 ## Overview
 
@@ -250,6 +250,50 @@ The Hindu project's Swift port achieves:
 ### Key Insight
 
 The Moshier port (class→enum refactoring with local variables) was **bit-identical** to the original all along. All four bugs were in how we called the engine — wrong units, missing offsets, wrong altitude, wrong dip formula — not in the engine itself. The solar longitude, RA, declination, nutation, and obliquity matched perfectly at every test point.
+
+## Baked Solar Tables (2026-04-16)
+
+All 4 Hindu solar calendars (Tamil, Bengali, Odia, Malayalam) now use precomputed `PackedHinduSolarYearData` for ~1900–2050. **~500× speedup** vs the Moshier path.
+
+### Packing
+
+```
+monthData: UInt32 (4 bytes)
+  Bits 0-23:  month lengths, 2 bits × 12 months (00=29d, 01=30d, 10=31d, 11=32d)
+  Bits 24-31: unused
+
+newYearOffset: UInt16 (2 bytes)
+  Offset in days from per-variant `baseNewYear: Int32` constant.
+  Max observed offset: 54,423 (fits UInt16 max 65,535).
+```
+
+Total per entry: **6 bytes**. Per variant: 150 entries × 6 + 4 bytes base = 904 bytes. Four variants = **3,616 bytes total**.
+
+### Year-start handling
+
+The `yearStartMonth` is computed at compile time from the variant's static constants:
+
+```swift
+UInt8(((V.yearStartRashi - V.firstRashi + 12) % 12) + 1)
+```
+
+For Tamil/Bengali/Malayalam this is 1 (years run January-style, regional months 1-12 in order).
+For **Odia**, this is 6 — the year runs chronologically 6,7,…,12,1,2,…,5 (September–August). Month length bits are still indexed by regional month number; `daysBeforeMonth` walks chronologically from `yearStartMonth`, wrapping through 12 → 1.
+
+### Benchmarks (release, x86_64)
+
+| Variant | Before (Moshier) | After (baked) | Speedup |
+|---|---:|---:|---:|
+| Tamil | 1,334 µs | 2.4 µs | ~556× |
+| Bengali | 819 µs | 2.5 µs | ~328× |
+| Odia | ~450 µs | 2.5 µs | ~180× |
+| Malayalam | ~450 µs | 2.7 µs | ~167× |
+
+Outside the baked range, the Moshier path is retained as fallback.
+
+### Lunisolar (not baked)
+
+Amanta and Purnimanta remain fully astronomical — the year structure (adhika masa inserts a 13th month, kshaya tithi skips days) is too complex for the current packing scheme. Currently ~3,900 µs/date. Deferred to `Docs/NEXT.md`.
 
 ## Source
 
