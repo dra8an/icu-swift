@@ -115,7 +115,9 @@ variant.
 - **Hindu lunisolar** — Amanta, Purnimanta. Year structure is complex
   (adhika masa, kshaya tithi) and the months-per-year varies. Would require
   a more elaborate packing scheme. Currently ~3,900 µs/date via Moshier;
-  worth profiling before committing to a design.
+  a concrete layout proposal exists below under "Deferred Work → Hindu
+  lunisolar baking proposal" — shelved because it would nearly triple
+  total baked data for a single calendar.
 
 - **Dangi (Korean)** — structurally identical to Chinese but with UTC+9
   reference longitude. Differences only show up at the ±1-hour boundary
@@ -127,8 +129,83 @@ variant.
 | Item | Why deferred |
 |---|---|
 | Dangi baked data | KASI data harder to get than HKO; differences vs Chinese are rare boundary cases |
-| Hindu lunisolar baked data | Complex year structure (adhika, kshaya); worth profiling first |
+| Hindu lunisolar baked data | ~8 KB/calendar; 7× blow-up of total baked footprint for one calendar. Concrete layout below. |
 | Chinese 1700–1900 extension | HKO data only covers 1901+; would need Qing-era astronomical recomputation |
+
+### Hindu lunisolar baking proposal (shelved 2026-04-17)
+
+**Context.** Lunisolar Amanta/Purnimanta is the last slow-tier calendar at
+~3,900 µs/date. Baking would land it in the 2–5 µs tier like Chinese and
+Hindu solar — an estimated ~1,000× speedup. Shelved because the data
+footprint (~8 KB) is ~7× larger per calendar than anything else we bake,
+nearly tripling the total (5 KB → 13 KB). Revisit if lunisolar performance
+becomes a concrete blocker.
+
+**Why it's structurally harder than Chinese.** Chinese has a clean year
+structure: 12 or 13 lunar months, each 29 or 30 civil days, day-of-month
+maps 1:1 to civil-day-ordinal within the month. Hindu lunisolar adds
+**kshaya tithi** (a tithi skipped — civil-day-to-tithi mapping jumps) and
+**adhika tithi** (a tithi repeated — two consecutive civil days share a
+tithi number). These events are frequent, not rare: ~28 events/year on
+average (roughly half kshaya, half adhika).
+
+**Event-frequency evidence** (from `validation/moshier/adhika_kshaya_tithis.csv`,
+151 years 1900–2050, reference location New Delhi):
+
+| Metric | Value |
+|---|---:|
+| Total events (1900–2050) | 4,269 |
+| Mean events/year | 28.3 |
+| Max events/year | 33 (1971) |
+| Max events in a single masa | 7 (masa 2 of 1934) |
+
+**Proposed packing (variable-length per year):**
+
+```
+Header (UInt32, 4 bytes):
+  newYearOffset    : 16 bits   days from per-calendar baseNewYear: Int32
+  monthLengthBits  : 13 bits   29d (0) or 30d (1) per month
+  leapMonthOrdinal : 4 bits    0 = no leap masa, 1–13 = ordinal position
+  (padding)        : ~3 bits
+
+eventCount (UInt8, 1 byte):
+  Max observed 33; 6 bits would suffice but UInt8 keeps byte-alignment.
+
+Events (10 bits × eventCount, packed):
+  month    : 4 bits  (1–13)
+  civilDay : 5 bits  (1–30 — day within the masa)
+  type     : 1 bit   (0 = kshaya, 1 = adhika)
+```
+
+The skipped kshaya tithi is not stored — it's derivable from the adjacent
+civil day's tithi-at-sunrise, which the calendar can reconstruct from
+month + civilDay + event sequence.
+
+**Storage (200-year range, New Delhi):**
+
+| Item | Bytes |
+|---|---:|
+| Header + eventCount | 5 |
+| Events (mean 28 events) | 35 |
+| Events (max 33 events) | 42 |
+| Per-year typical | ~40 |
+| Per-year max | ~47 |
+| 200 years × mean | ~8.0 KB |
+| Per-year offset index (UInt16 × 200, for O(1) lookup) | 0.4 KB |
+| **Total per calendar** | **~8.4 KB** |
+
+This would be shared between Amanta and Purnimanta — they have identical
+underlying year structure; Purnimanta is a label remap at the month level
+(shukla tithis keep the masa; krishna tithis belong to the next masa).
+
+**Location constraint.** Hindu lunisolar is location-dependent
+(sunrise-sensitive). Baking assumes the default location (`newDelhi`);
+other locations fall through to Moshier, mirroring how Chinese assumes
+Beijing and Dangi assumes Seoul.
+
+**Alternative to full baking — LRU cache of year structure.** Would give
+a ~5–20× speedup (~200–800 µs/date) with zero baked data and full
+location flexibility. Worth trying first if anyone picks this up.
 
 ## Reference Implementation (ICU4X)
 

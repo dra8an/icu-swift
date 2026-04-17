@@ -1,0 +1,51 @@
+# Docs-Foundation — Master Index
+
+*Last updated 2026-04-17.*
+
+This directory contains all planning, design, and tracking documents for
+the effort to integrate `icu4swift`'s calendar algorithms into
+`swift-foundation`, replacing the C/C++ ICU4C calendar backend.
+
+## How to use this directory
+
+Start with **`PROJECT_PLAN.md`** for the high-level roadmap. Check
+**`STATUS.md`** for where we are, and **`NEXT.md`** for what is being
+worked on now. The numbered docs (`00`–`07`) are durable design
+references; the four project-tracking docs update as the project
+progresses.
+
+## Project-tracking documents
+
+Read-and-update throughout the project. Keep them current.
+
+| File | Purpose |
+|---|---|
+| **`MASTER.md`** | This file — index of every document here and what it is for. |
+| **`PROJECT_PLAN.md`** | High-level roadmap: the four stages of the port, phases within each, and acceptance criteria. The answer to "what are we doing and in what order". |
+| **`STATUS.md`** | Current state: which docs exist, which calendars are ported, which perf baselines are captured, what is in flight vs. complete. Updated at each checkpoint. |
+| **`NEXT.md`** | Near-term pipeline: immediate next tasks in priority order. Updated whenever work shifts. |
+
+## Design & reference documents
+
+Written once per topic; updated only when the design changes.
+
+| File | Purpose |
+|---|---|
+| **`00-Overview.md`** | Mission, destination state, scope, acceptance criteria, risk register. The "why this exists" doc. |
+| **`01-FoundationCalendarSurface.md`** *(planned)* | How `swift-foundation`'s calendar layer works today: `_CalendarProtocol`, `_CalendarGregorian`, `_CalendarICU`, `_CalendarBridged`, `CalendarCache` dispatch, the integration seam. |
+| **`02-ICUSurfaceToReplace.md`** *(planned)* | The 17 `ucal_*` functions `_CalendarICU` calls, the C++ classes behind them, what icu4swift must match behaviorally. |
+| **`03-CoverageAndSemanticsGap.md`** *(planned)* | Diagnosis: identifier map (Foundation × ICU upstream × swift-foundation-icu fork × icu4swift), capability gaps icu4swift must close. |
+| **`04-icu4swiftGrowthPlan.md`** *(planned)* | **Stage 1 roadmap.** How icu4swift grows to cover Foundation semantics (TZ awareness, firstWeekday, range/ordinality/dateInterval, nextDate/enumerateDates, sparse DateComponents). Phased plan with its own acceptance criteria. |
+| **`05-PerformanceParityGate.md`** *(planned)* | Benchmark design, baseline-capture protocol, per-calendar per-operation thresholds. Crosscuts every stage. |
+| **`06-FoundationPortPlan.md`** *(planned)* | **Stages 2–4 roadmap.** Calendar-by-calendar port into `swift-foundation` in risk order; per-calendar acceptance gate. |
+| **`07-OpenQuestions.md`** *(planned)* | Alignment items needing stakeholder decisions before we commit to specifics. |
+| **`MigrationIssues.md`** | Design clarifications on two early concerns (Foundation mutability, RataDie vs. millisecond time basis) that turned out to be non-issues. Captures reasoning so it is not lost. |
+
+## Relationship to icu4swift's own docs
+
+The icu4swift project ships its own `Docs/` directory with per-calendar
+specs (`Docs/Chinese.md`, `Docs/Hebrew.md`, etc.) plus its own tracking
+(`Docs/STATUS.md`, `Docs/NEXT.md`, `Docs/HANDOFF.md`). Those remain the
+authoritative sources for icu4swift's algorithms and test coverage.
+`Docs-Foundation/` concerns only the Foundation integration effort and
+does not duplicate per-calendar algorithm details.

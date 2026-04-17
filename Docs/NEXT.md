@@ -38,10 +38,10 @@ Three calendar families now use packed year data stored in `DateInner`:
 
 **Hindu lunisolar** is the last slow tier (~3,900 µs/date for Amanta, Purnimanta). Not yet profiled or baked.
 
-- **Profile first** to identify hot spots (likely sunrise calculation and tithi boundary bisection).
-- **Baking is non-trivial** — year structure is complex (adhika masa inserts a 13th month, kshaya tithi skips days). Would require a new packing scheme beyond what Chinese/Hindu solar use.
-- **Alternative: per-date cache** — cache `(rd, tithi boundaries)` since consecutive dates often recompute the same sunrise/tithi pair.
-- **Impact:** unclear without profiling. Current 3,900 µs is fine for one-off conversions but slow for bulk date rendering.
+- **Profile first** to identify hot spots (`toRataDie` dominates — up to 14 iterations of `masaForGregorian` in `amantaMonthStart`, then up to 32 civil-day sunrise+tithi evaluations).
+- **Baking proposal documented** in `BakedDataStrategy.md` → "Hindu lunisolar baking proposal" (~8 KB per calendar, est. ~1,000× speedup). Shelved — ~7× blow-up of total baked footprint for one calendar.
+- **Alternative: LRU cache of year structure** — 5–20× speedup without baked data.
+- **Impact:** current 3,900 µs is fine for one-off conversions but slow for bulk date rendering.
 
 ### Dangi (Korean) baked data — Deferred
 
