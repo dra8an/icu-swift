@@ -186,16 +186,21 @@ astronomy is 2.8 MB.
 |---|---:|---:|---:|
 | Chinese (HKO, 1901–2099) | 199 | 4 bytes (UInt32) | 796 bytes |
 | Umm al-Qura (KACST, 1300–1600 AH) | 301 | 2 bytes (UInt16) | 602 bytes |
-| Hindu Tamil (1822–1971 Saka) | 150 | 8 bytes (UInt32 + Int32) | 1,200 bytes |
-| Hindu Bengali (1307–1456) | 150 | 8 bytes | 1,200 bytes |
-| Hindu Odia (1308–1457) | 150 | 8 bytes | 1,200 bytes |
-| Hindu Malayalam (1076–1225) | 150 | 8 bytes | 1,200 bytes |
-| **Total** | | | **6,198 bytes** (~6 KB) |
+| Hindu Tamil (1822–1971 Saka) | 150 | 6 bytes (UInt32 + UInt16) + 4 | 904 bytes |
+| Hindu Bengali (1307–1456) | 150 | 6 bytes + 4 | 904 bytes |
+| Hindu Odia (1308–1457) | 150 | 6 bytes + 4 | 904 bytes |
+| Hindu Malayalam (1076–1225) | 150 | 6 bytes + 4 | 904 bytes |
+| **Total** | | | **5,014 bytes** (~5 KB) |
 
-The baked tables add **~6 KB** — 1.4% of the relevant modules, 0.2% of
+The baked tables add **~5 KB** — 1.2% of the relevant modules, 0.16% of
 the full library. The payoff: eliminating all Moshier astronomical
 calculations for the most common date range, with speedups ranging from
 200× (Chinese) to 500× (Hindu solar).
+
+Hindu solar years use a **UInt16 offset** from a per-variant `baseNewYear:
+Int32` constant (instead of storing each year's full RataDie). Offsets
+range 0–54,423 days across 150 years, fitting comfortably in UInt16
+(max 65,535). Saves 2 bytes per year × 600 entries = 1,184 bytes.
 
 ### Source Code
 

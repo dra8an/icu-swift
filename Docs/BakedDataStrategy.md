@@ -1,206 +1,163 @@
 # Baked Data & Year Compression Strategy
 
-*Created: 2026-04-10 — based on ICU4X design research and input from ICU4X
-contributor*
+*Created: 2026-04-10. Last updated: 2026-04-16.*
 
-## Context
+Based on ICU4X design research and input from an ICU4X contributor.
 
-ICU4X's design philosophy for complex calendars is built around two ideas:
+## Principle
 
-1. **Year compression** — all the expensive calculations for a given year
-   (month lengths, leap month identity, new year date) are compressed into a
-   small packed struct (`YearInfo`), computed once, and reused for every date
-   in that year.
+Complex calendars (astronomical lunisolar, Umm al-Qura) are expensive to
+compute at runtime — Moshier ephemeris evaluations for a single Chinese year
+cost ~586 ms. For the "normal" date range that most applications need,
+icu4swift **precomputes** the year structure into compact const arrays
+("baked data"), packed into the date's inner representation so that every
+field accessor and arithmetic operation is a lock-free bit op.
 
-2. **Baked-in data tables** — for a "normal" date range (typically
-   1900–2100), the packed year data is precomputed and shipped as a const
-   array. Runtime code does a simple table lookup instead of astronomical
-   computation. Astronomical calculation is only used as a fallback outside
-   the baked range.
+Outside the baked range, we fall back to the full astronomical engine.
 
-This document records how ICU4X implements these patterns, what icu4swift
-currently does, and a prioritized plan for closing the gap.
+## Current State
 
-## How ICU4X Does It
+### Chinese — `ChineseYearTable` (2026-04-13)
 
-### East Asian Calendars (Chinese, Dangi)
+- **Range:** 1901–2099 (199 entries, HKO-sourced)
+- **Per-entry:** `UInt32` (4 bytes)
+  - Bits 0–12: month lengths for 13 months (1 = 30d, 0 = 29d)
+  - Bits 13–16: leap month ordinal (0 = none, 2–13 = position)
+  - Bits 17–22: new year offset from Jan 19 of related ISO year
+- **Storage:** 199 × 4 bytes = **796 bytes**
+- **DateInner:** `ChineseDateInner` carries `packed: PackedChineseYearData`
+- **Fallback:** Moshier via `ChineseYearCache` (LRU-8) for dates outside range
+- **Result:** ~586 ms cold start → **< 0.001 ms** for baked range
 
-**Type:** `PackedEastAsianTraditionalYearData` — **3 bytes (24 bits)**
+### Islamic Umm al-Qura — `UmmAlQuraData` (2026-04-10)
 
-```
-Bits  0-12: Month lengths bitmask for 13 months (1 = 30 days, 0 = 29 days)
-Bits 13-16: Leap month ordinal (0 = no leap, 2-13 = which month)
-Bits 17-22: Chinese New Year offset from January 19 (range 0-34 days)
-```
+- **Range:** 1300–1600 AH / ~1882–2174 CE (301 entries, KACST-sourced)
+- **Per-entry:** `UInt16` (2 bytes)
+  - Bits 0–11: month lengths for 12 months
+  - Bit 12: sign flag for start-day offset
+  - Bits 13–15: abs(offset) from mean tabular start (max ±1)
+- **Storage:** 301 × 2 bytes = **602 bytes**
+- **Fallback:** Islamic Civil (Friday epoch, Type II) for dates outside range
+- **Data provenance:** KACST → ICU4C; offsets recomputed for our epoch
 
-A single 24-bit value fully describes a Chinese/Dangi year: its new-year
-date, every month length, and the leap month identity. Given a year's packed
-data and the related ISO year, every calendar operation reduces to bit
-manipulation — no astronomy needed.
+### Hindu Solar — `HinduSolarYearTable` (2026-04-16)
 
-**Baked data tables:**
+- **Range:** ~1900–2050 for each of 4 regional variants
+  - Tamil (1822–1971 Saka)
+  - Bengali (1307–1456)
+  - Odia (1308–1457) — `yearStartMonth = 6` (year runs chronologically 6,7,…,12,1,2,…,5)
+  - Malayalam (1076–1225)
+- **Per-entry:** `UInt32` month data + `UInt16` new-year offset = **6 bytes**
+  - Month data (24 bits): 2 bits × 12 months (00=29d, 01=30d, 10=31d, 11=32d)
+  - New-year offset: days from a per-variant `baseNewYear: Int32` constant
+    - Max observed offset: 54,423 (fits in UInt16; max 65,535)
+- **Per-variant fixed overhead:** 4 bytes (baseNewYear)
+- **Storage per variant:** 150 × 6 + 4 = 904 bytes
+- **Total:** 4 × 904 = **3,616 bytes**
+- **Fallback:** Moshier via the existing `HinduSolarArithmetic` engine
 
-| Table | Range | Entries | Location |
-|---|---|---:|---|
-| `china_data` | 1912–2102 CE | 191 | `east_asian_traditional.rs` |
-| `qing_data` | 1900–1911 CE | 12 | `east_asian_traditional.rs` |
-| `korea_data` | 1912–2102 CE | 191 | `east_asian_traditional.rs` |
+### Grand Total
 
-**Decision logic:**
+| Calendar | Entries | Bytes |
+|---|---:|---:|
+| Chinese (1901–2099) | 199 | 796 |
+| Umm al-Qura (1300–1600 AH) | 301 | 602 |
+| Hindu Tamil | 150 | 904 |
+| Hindu Bengali | 150 | 904 |
+| Hindu Odia | 150 | 904 |
+| Hindu Malayalam | 150 | 904 |
+| **Total** | **1,100** | **5,014** |
 
-```
-if year in china_data (1912–2102) → table lookup
-else if year > 1912 → simplified runtime calculation
-else if year in qing_data (1900–1911) → table lookup
-else → simplified runtime calculation
-```
+**~5 KB of baked data**, 0.16% of the 2.8 MB full library.
 
-The "simplified" calculation uses a UTC+8 (Beijing) timezone approximation
-rather than full astronomical computation, and only kicks in outside the
-baked range.
+## Design Choices
 
-### Islamic Calendars (Umm al-Qura)
+### Pack year data into the date
 
-**Type:** `PackedHijriYearData` — **2 bytes (16 bits)**
+ICU4X's `DateInner` types carry the packed year data alongside year/month/day.
+We follow the same pattern: `ChineseDateInner.packed: PackedChineseYearData`.
+This eliminates cache lookups and lock contention during arithmetic —
+`Date.added(.days, 100)` walks month boundaries using the packed data
+directly, never reaching back to the calendar.
 
-```
-Bits  0-11: Month lengths bitmask (1 = 30 days, 0 = 29 days) for 12 months
-Bit    12 : Sign bit for start-day offset
-Bits 13-15: Absolute value of start-day offset from tabular epoch (±5 days)
-```
+### Compute once, then cheap bit ops
 
-This is used for the **Umm al-Qura** calendar (observational/astronomical),
-not for Islamic Tabular which is already pure arithmetic. The baked data
-covers 1300 AH onward (~1882 CE).
+For the baked range, all expensive work is done at compile time (table
+generation from Moshier or HKO). At runtime, every query is an array index
+plus a bit shift. For the fallback range, compute once via Moshier, cache
+the result, and pack it into the same format — so the date carries
+pre-computed year data regardless of which path produced it.
 
-**Note:** icu4swift does not implement Umm al-Qura yet, so this pattern is
-informational — it would be needed if/when we add that calendar.
+### Use UInt16 offsets when possible
 
-### Hindu Calendars
+For Hindu solar: storing full RataDie values as `Int32` wasted 2 bytes per
+year (RD values were 693k–748k, trivially encoded as a UInt16 offset from a
+per-variant base). Saved 1,184 bytes (~19% of Hindu solar data).
 
-ICU4X does not appear to use baked data for Hindu calendars (they are
-computed astronomically at runtime). This matches our current approach.
+Same principle applies to the Chinese new year offset (Jan 19 + ≤34 days →
+6 bits) and the Umm al-Qura offset (±1 → 3 bits).
 
-## What icu4swift Currently Does
+### Variant-specific year-start handling
 
-### Chinese / Dangi
+Hindu Odia's year starts at regional month 6 (Kanya/September), so the
+chronological order is 6,7,…,12,1,2,…,5. The `yearStartMonth` is
+computed from the variant's static constants (`yearStartRashi`,
+`firstRashi`) — not stored in the packed data, since it's constant per
+variant.
 
-```
-ChineseYearData struct:
-  - newYear: RataDie          (8 bytes)
-  - monthLengths: [Bool]      (heap-allocated array, 13 entries)
-  - leapMonth: UInt8?          (2 bytes)
+## What NOT to Bake
 
-ChineseYearCache:
-  - Global singleton (ChineseYearCache.shared)
-  - LRU-8 (os_unfair_lock protected)
-  - Computes via full Moshier engine on cache miss
-  - ~586 ms per cache miss (cold), near-zero on hit
-```
+- **Arithmetic calendars** — ISO, Gregorian, Julian, Buddhist, ROC, Coptic,
+  Ethiopian, Persian, Hebrew, Indian, Islamic Tabular, Islamic Civil,
+  Japanese. All are already sub-microsecond with direct integer math.
+  Table lookup would not be faster.
 
-**No baked data.** Every first-access to a year triggers the full
-Moshier-based astronomical pipeline: winter solstice search, ~15 new moon
-calculations, leap month detection, month length enumeration.
+- **Hindu lunisolar** — Amanta, Purnimanta. Year structure is complex
+  (adhika masa, kshaya tithi) and the months-per-year varies. Would require
+  a more elaborate packing scheme. Currently ~3,900 µs/date via Moshier;
+  worth profiling before committing to a design.
 
-### Islamic Tabular / Civil
+- **Dangi (Korean)** — structurally identical to Chinese but with UTC+9
+  reference longitude. Differences only show up at the ±1-hour boundary
+  between Seoul and Beijing midnight. Deferred; would need KASI-sourced
+  data (not as accessible as HKO).
 
-Already pure integer arithmetic. No year compression needed — every
-operation is already O(1) with trivial constants.
+## Deferred Work
 
-### Hindu
+| Item | Why deferred |
+|---|---|
+| Dangi baked data | KASI data harder to get than HKO; differences vs Chinese are rare boundary cases |
+| Hindu lunisolar baked data | Complex year structure (adhika, kshaya); worth profiling first |
+| Chinese 1700–1900 extension | HKO data only covers 1901+; would need Qing-era astronomical recomputation |
 
-Full astronomical computation at runtime. No caching layer currently.
-Performance has not been profiled in detail.
+## Reference Implementation (ICU4X)
 
-## Gap Analysis
+Where we followed ICU4X's design:
 
-| Area | ICU4X | icu4swift | Status |
-|---|---|---|---|
-| Chinese year packing | 3 bytes packed | `PackedChineseYearData` (UInt32) | ✅ Done (2026-04-13) |
-| Chinese baked data | 191+12 entries | 199 entries (1901–2099) | ✅ Done — HKO-sourced |
-| Chinese date carries year data | YearInfo in date | `packed` field in `ChineseDateInner` | ✅ Done — lock-free accessors |
-| Dangi baked data | 191 entries | Uses Chinese table + Moshier fallback | Deferred |
-| Islamic Umm al-Qura | 2-byte packed + baked | 301 entries (1300–1600 AH) | ✅ Done (2026-04-10) |
-| Hindu solar baked | Not done | 4×150 entries (~1900–2050) | ✅ Done (2026-04-16) |
-| Hindu lunisolar caching | No caching | No caching | Not attempted (complex structure) |
+- `components/calendar/src/cal/east_asian_traditional.rs` — `PackedEastAsianTraditionalYearData`, `china_data`, `qing_data`, `korea_data`.
+- `components/calendar/src/cal/hijri.rs` — `PackedHijriYearData`, Umm al-Qura baked data.
+- `utils/calendrical_calculations/src/chinese_based.rs` — astronomical fallback code.
 
-## Recommended Actions — Prioritized
+Where we diverged:
 
-### 1. ✅ Bake Chinese year data (DONE — 2026-04-13)
+- **Hindu solar baking** — ICU4X does not bake Hindu data. Our Moshier-based
+  Hindu implementation is slow enough (~1,300 µs/date) that baking paid off
+  handsomely (~500× speedup). ICU4X may not have this need because it uses
+  different algorithms.
+- **Epoch** — our `JulianArithmetic.fixedFromJulian(622, 7, 16)` = 227015.
+  ICU4X's = 227016. This caused issues when copying ICU4X's Umm al-Qura
+  packed offsets directly — we had to recompute them against Foundation
+  (which matches our epoch).
 
-**Result:** 199-entry `ChineseYearTable` covering 1901–2099, generated from
-HKO data. `PackedChineseYearData` (UInt32) encodes month lengths (13 bits),
-leap month ordinal (4 bits), and new-year offset from Jan 19 (6 bits).
+## Benchmark Summary (2026-04-16)
 
-`ChineseDateInner` now carries its `packed: PackedChineseYearData` field.
-All field accessors and arithmetic read from it directly — no cache, no
-lock. Moshier fallback remains for dates outside 1901–2099 via
-`ChineseYearCache`.
+| Calendar | Before (µs/date) | After (µs/date) | Speedup |
+|---|---:|---:|---:|
+| Chinese | 586,000 (cold) / 21 (cached) | 2.2 | ~270,000× / ~10× |
+| Umm al-Qura | — (new calendar) | 2.3 | baseline |
+| Hindu Tamil | 1,334 | 2.4 | ~556× |
+| Hindu Bengali | 819 | 2.5 | ~328× |
+| Hindu Odia | ~450 | 2.5 | ~180× |
+| Hindu Malayalam | ~450 | 2.7 | ~167× |
 
-Cold start: **~586 ms → < 0.001 ms** for 1901–2099 dates.
-
-### 2. ✅ Pack `ChineseYearData` (DONE — merged with #1)
-
-`PackedChineseYearData` is the packed type. It serves as both the baked
-table entry and the field stored in `ChineseDateInner`. Computed
-`ChineseYearData` (from Moshier) is packed on the fly via
-`PackedChineseYearData.from(yearData:relatedIso:)` for dates outside the
-baked range.
-
-### 3. Bake Dangi year data for 1900–2100
-
-**Impact:** Same as Chinese, but for the Korean calendar.
-
-**Approach:**
-- Generate from `korean_lunar_calendar_py` (KASI-sourced tables) or from
-  our own Moshier engine at the Seoul longitude.
-- Same packed format as Chinese.
-- Separate table (`korea_data`) since month boundaries can differ by ±1 day
-  due to the Seoul-vs-Beijing longitude shift.
-
-### 4. Profile and consider caching for Hindu calendars
-
-**Impact:** Unknown — needs profiling first.
-
-**Approach:**
-- Run the Hindu regression test under Instruments to identify hot spots.
-- If sunrise/longitude calculations dominate, consider a similar year-data
-  cache. Hindu year structure is more complex (solar months don't map 1:1
-  to lunar months in the lunisolar variant), so packing is harder.
-- May not need baked data if a simple LRU cache provides sufficient speedup.
-
-### 5. Future: Umm al-Qura with baked data
-
-**Impact:** Only relevant if/when we implement the Umm al-Qura calendar.
-
-**Approach:**
-- Follow ICU4X's `PackedHijriYearData` pattern (2 bytes per year).
-- Bake the official Saudi Umm al-Qura tables.
-- Fallback to observational calculation or tabular approximation outside
-  the baked range.
-
-## What NOT to Do
-
-- **Don't bake Islamic Tabular / Civil.** Already pure arithmetic — table
-  lookup would not be faster than the integer formula.
-- **Don't bake Hebrew.** Same — pure arithmetic, already sub-microsecond.
-- **Don't bake Coptic / Ethiopian / Persian / Indian.** Same.
-- **Don't over-engineer the cache.** The current LRU-8 with `os_unfair_lock`
-  is simple and correct. Consider growing it or making it per-instance, but
-  don't introduce complex eviction policies.
-
-## References
-
-- ICU4X `components/calendar/src/cal/east_asian_traditional.rs` — packed
-  year data, baked tables (`china_data`, `qing_data`, `korea_data`), and the
-  lookup/fallback logic.
-- ICU4X `components/calendar/src/cal/hijri.rs` — `PackedHijriYearData` and
-  Umm al-Qura baked data.
-- ICU4X `utils/calendrical_calculations/src/chinese_based.rs` — the
-  astronomical fallback code.
-- icu4swift `Sources/CalendarAstronomical/ChineseCalendar.swift` — current
-  `ChineseYearData` and `ChineseYearCache`.
-- icu4swift `Tests/CalendarAstronomicalTests/chinese_months_1901_2100_hko.csv`
-  — HKO-validated year data that can seed the baked table.
-- icu4swift `Docs/PERFORMANCE.md` — existing Chinese cache benchmarks
-  (586 ms uncached, 644 ms cached, 39× speedup over 30 consecutive days).
+See `PERFORMANCE.md` for the full benchmark table and methodology.
