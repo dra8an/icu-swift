@@ -1,6 +1,6 @@
 # Foundation Calendar Port — Status
 
-*Last updated 2026-04-17. Update this file at every checkpoint.*
+*Last updated 2026-04-17 (end-of-day). Update this file at every checkpoint.*
 
 One-page snapshot of where the project stands. For the roadmap see
 `PROJECT_PLAN.md`; for immediate next steps see `NEXT.md`.
@@ -27,6 +27,10 @@ Durable design + reference docs:
 | `PROJECT_PLAN.md` | written |
 | `STATUS.md` | written (this file) |
 | `NEXT.md` | written |
+| `OPEN_ISSUES.md` | written |
+| `PITCH.md` | written |
+| `TIMEZONE_CONSIDERATION.md` | written |
+| `BENCHMARK_RESULTS.md` | written (Chinese only) |
 | `00-Overview.md` | written |
 | `MigrationIssues.md` | written |
 | `01-FoundationCalendarSurface.md` | not started |
@@ -78,17 +82,42 @@ Legend: ✓ implemented · ~ partial · — missing.
 
 ## Performance baselines
 
-| Identifier | ICU baseline captured | Notes |
-|---|:-:|---|
-| *(all)* | — | Stage 0 not started; current Foundation benchmarks are Gregorian-only. |
+Initial spot-measurements captured in `BENCHMARK_RESULTS.md` — not
+the formal Stage 0 gate, but enough to de-risk the pitch.
+
+| Calendar family | icu4swift | Foundation | Spot-measured |
+|---|---:|---:|:-:|
+| Chinese (baked, 2024) | 1.9 µs | ~12 µs | ✓ (icu4swift 7× faster) |
+| Chinese (Moshier, 2200, 1000d) | 3.4 µs | ~41 µs | ✓ (icu4swift 12× faster) |
+| Chinese (Moshier, 1850, 1000d) | 26 µs | ~44 µs | ✓ (icu4swift 1.7× faster) |
+| Chinese (Moshier, 1850, 30d) | 357 µs | ~30 µs | ✓ (**Foundation 12× faster** — narrow window) |
+| Arithmetic (Hebrew, Persian, Coptic, Ethiopian, Indian, Japanese, Islamic×3) | 1.5–2.9 µs | 1.1–1.6 µs | ✓ (Foundation 1.3–1.7× faster) |
+| Hindu lunisolar (Amanta, Purnimanta) | ~3,500 µs | ? (macOS 26.0+) | partial (icu4swift only) |
+
+**icu4swift self-bench:** 20 of 22 calendars sub-3 µs; Hindu
+lunisolar is the slow tier.
+
+Formal Stage 0 (per-calendar ICU baseline capture within
+`swift-foundation`'s benchmark harness) is still pending.
 
 ## Open blockers
 
-None. Awaiting decision on doc ordering before continuing to the
-numbered reference docs (`01`–`07`).
+None blocking further doc work. For project-level risks see
+`OPEN_ISSUES.md`. The single most valuable next concrete action
+is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
+— see `OPEN_ISSUES.md` § "Recommended sequencing".
 
 ## Recent checkpoints
 
 - 2026-04-17 — Project started. Agents mapped swift-foundation and
   ICU surfaces. `00-Overview.md`, `MigrationIssues.md`, and the four
   tracking docs written.
+- 2026-04-17 (later) — `PITCH.md`, `TIMEZONE_CONSIDERATION.md`,
+  `OPEN_ISSUES.md`, `BENCHMARK_RESULTS.md` written. Chinese and
+  arithmetic-calendar perf benchmarks run against Foundation.
+  Key finding: icu4swift wins 7× on Chinese (baked range), wins
+  12× outside baked range on bulk spans, loses 1.3–1.7× on
+  arithmetic calendars. Full icu4swift self-bench captured: 20 of
+  22 calendars sub-3 µs, Hindu lunisolar is the slow tier. Scripts:
+  `Scripts/FoundationChineseBench.swift`,
+  `Scripts/FoundationCalBench.swift`.

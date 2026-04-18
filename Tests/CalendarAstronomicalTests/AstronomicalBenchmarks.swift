@@ -56,6 +56,57 @@ struct AstronomicalBenchmarks {
         }
         let elapsed = ProcessInfo.processInfo.systemUptime - t0
         let perDate = elapsed / Double(30) * 1_000_000
-        print("  Chinese (Moshier): 30 round-trips in \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDate)) µs/date)")
+        print("  Chinese (Moshier 1850): 30 round-trips in \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDate)) µs/date)")
+    }
+
+    @Test("Benchmark: Chinese (future, Moshier)")
+    func benchChineseFutureMoshier() {
+        // 30 dates in 2200 — post-baked range, triggers Moshier
+        let futureStart = GregorianArithmetic.fixedFromGregorian(year: 2200, month: 1, day: 1)
+        let calendar = Chinese()
+        let t0 = ProcessInfo.processInfo.systemUptime
+        for i in 0..<30 {
+            let rd = futureStart + Int64(i)
+            let date = Date<Chinese>.fromRataDie(rd, calendar: calendar)
+            let back = calendar.toRataDie(date.inner)
+            #expect(back == rd)
+        }
+        let elapsed = ProcessInfo.processInfo.systemUptime - t0
+        let perDate = elapsed / Double(30) * 1_000_000
+        print("  Chinese (Moshier 2200): 30 round-trips in \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDate)) µs/date)")
+    }
+
+    @Test("Benchmark: Chinese pre-baked (1000 days, stresses Moshier cache)")
+    func benchChinesePreBaked1000() {
+        // 1000 days starting Jan 1 1850 — spans ~3 Chinese years, forces cache churn
+        let start = GregorianArithmetic.fixedFromGregorian(year: 1850, month: 1, day: 1)
+        let calendar = Chinese()
+        let t0 = ProcessInfo.processInfo.systemUptime
+        for i in 0..<1000 {
+            let rd = start + Int64(i)
+            let date = Date<Chinese>.fromRataDie(rd, calendar: calendar)
+            let back = calendar.toRataDie(date.inner)
+            #expect(back == rd)
+        }
+        let elapsed = ProcessInfo.processInfo.systemUptime - t0
+        let perDate = elapsed / Double(1000) * 1_000_000
+        print("  Chinese (Moshier 1850, 1000d): \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDate)) µs/date)")
+    }
+
+    @Test("Benchmark: Chinese post-baked (1000 days, stresses Moshier cache)")
+    func benchChinesePostBaked1000() {
+        // 1000 days starting Jan 1 2200
+        let start = GregorianArithmetic.fixedFromGregorian(year: 2200, month: 1, day: 1)
+        let calendar = Chinese()
+        let t0 = ProcessInfo.processInfo.systemUptime
+        for i in 0..<1000 {
+            let rd = start + Int64(i)
+            let date = Date<Chinese>.fromRataDie(rd, calendar: calendar)
+            let back = calendar.toRataDie(date.inner)
+            #expect(back == rd)
+        }
+        let elapsed = ProcessInfo.processInfo.systemUptime - t0
+        let perDate = elapsed / Double(1000) * 1_000_000
+        print("  Chinese (Moshier 2200, 1000d): \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDate)) µs/date)")
     }
 }

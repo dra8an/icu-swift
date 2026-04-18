@@ -24,6 +24,9 @@ Read-and-update throughout the project. Keep them current.
 | **`PROJECT_PLAN.md`** | High-level roadmap: the four stages of the port, phases within each, and acceptance criteria. The answer to "what are we doing and in what order". |
 | **`STATUS.md`** | Current state: which docs exist, which calendars are ported, which perf baselines are captured, what is in flight vs. complete. Updated at each checkpoint. |
 | **`NEXT.md`** | Near-term pipeline: immediate next tasks in priority order. Updated whenever work shifts. |
+| **`OPEN_ISSUES.md`** | Project-level risks and concerns: stakeholder alignment, ICU quirks, perf unknowns, scope creep. Updated when issues resolve or new ones emerge. Distinct from `07-OpenQuestions.md`, which holds stakeholder-decision items. |
+| **`PITCH.md`** | The plan for pitching this project to the `swift-foundation` team in a 3–5 minute window. Four-beat structure, proof points, anti-stranding rules, pre-pitch checklist. |
+| **`BENCHMARK_RESULTS.md`** | Measured benchmark results comparing icu4swift against Foundation. Currently has Chinese calendar (icu4swift 7–8× faster). Grows as more calendars are measured. |
 
 ## Design & reference documents
 
@@ -40,6 +43,7 @@ Written once per topic; updated only when the design changes.
 | **`06-FoundationPortPlan.md`** *(planned)* | **Stages 2–4 roadmap.** Calendar-by-calendar port into `swift-foundation` in risk order; per-calendar acceptance gate. |
 | **`07-OpenQuestions.md`** *(planned)* | Alignment items needing stakeholder decisions before we commit to specifics. |
 | **`MigrationIssues.md`** | Design clarifications on two early concerns (Foundation mutability, RataDie vs. millisecond time basis) that turned out to be non-issues. Captures reasoning so it is not lost. |
+| **`TIMEZONE_CONSIDERATION.md`** | How the port handles TimeZone and DST — an anticipated concern from the `swift-foundation` team. Scope boundary (TZ data out, TZ-aware adapter in), DST follow-up Q&A. |
 
 ## Relationship to icu4swift's own docs
 
