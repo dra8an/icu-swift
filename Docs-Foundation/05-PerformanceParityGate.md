@@ -264,6 +264,57 @@ A half-ported calendar is not a shipped calendar.
 
 ## Edge cases and pitfalls
 
+### Assertion macros in timed loops (NEVER for perf tests)
+
+**Scope:** this rule applies to **performance benchmarks only** —
+any test that reports timing numbers. Normal correctness tests that
+check a handful of conditions are fine to use `#expect` freely; the
+overhead is invisible at those scales.
+
+**Hard rule for perf benchmarks:** no `#expect`, `XCTAssertEqual`,
+or any test-framework assertion macro inside the timed region.
+
+Swift Testing's `#expect` costs roughly **1.5 µs per invocation** on
+the success path — it captures source location, builds an
+`__Expression` metadata value, allocates autoclosures, and crosses
+the module boundary into the `Testing` package. For any
+operation-under-test below ~10 µs, `#expect` dominates the
+measurement.
+
+Correct shape:
+
+```swift
+// Warm-up (NOT timed)
+for i in 0..<warmup { ...accumulate into checksum... }
+
+let t0 = ProcessInfo.processInfo.systemUptime
+for i in 0..<iters {
+    ...work, accumulate into checksum...
+}
+let elapsed = ProcessInfo.processInfo.systemUptime - t0
+
+// Verify work actually happened — OUTSIDE the timed region.
+#expect(checksum != 0)
+```
+
+The checksum must depend on computed values, not just inputs, so the
+optimizer cannot elide the work.
+
+Discovered 2026-04-19: the `#expect(back == rd)` inside our
+arithmetic-calendar benchmarks inflated measurements by 15–300×
+compared to the actual calendar work. Nearly caused us to quote
+misleading numbers in a pitch. This rule exists so that doesn't
+happen again.
+
+A secondary note worth being aware of: **large-scale regression
+tests** (tens of thousands of iterations, each with `#expect`) can
+also spend most of their runtime inside the assertion-macro
+overhead. Correctness still passes; the test is just slower than
+necessary. If it becomes annoying, refactor to collect failures
+into an array and do one `#expect(failures.isEmpty)` at the end.
+This is an ergonomics concern, not a correctness or measurement
+concern.
+
 ### Measurement noise
 
 **Symptom.** Two consecutive runs of the same benchmark report

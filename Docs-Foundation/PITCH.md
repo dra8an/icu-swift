@@ -57,15 +57,21 @@ for a Foundation engineer:
    realistic spans outside it. Structural win from baked data
    versus ICU's runtime astronomy.
    
-   *Hebrew — the biggest arithmetic-calendar gap — is now at
-   parity:* 1.65 µs vs Foundation's 1.6 µs after targeted Swift
-   optimization. Other arithmetic calendars remain 1.25–1.55×
-   behind; that gap is generic wrapper overhead, not
-   per-calendar. Closing it is standard Swift optimization work."
+   *Low-level arithmetic-calendar math is also dramatically faster:*
+   Coptic ~5 ns/date, Persian ~22 ns/date, Hebrew ~95 ns/date (all
+   round-trips, release mode, 100k iters). Foundation's equivalent
+   `Calendar` API is 1,100–1,600 ns/date — but that's not an
+   apples-to-apples comparison because Foundation's API does more
+   per iteration (TZ conversion, sparse `DateComponents`, mutex).
+   Realistic prediction for the ported integration: icu4swift wins
+   1.5–5× on arithmetic calendars end-to-end, plus 2–12× on
+   astronomical."
    
-   See `BENCHMARK_RESULTS.md` for full tables. Acknowledge the
-   remaining arithmetic-calendar gap if asked; the Hebrew-parity
-   proof-point shows the pattern closes it.
+   See `BENCHMARK_RESULTS.md` for methodology and caveats.
+   Acknowledge the apples-to-oranges framing if asked — the
+   underlying calendar math being 10–300× faster is robust; the
+   end-to-end speedup depends on how much of that survives the
+   Calendar wrapper layer.
 
 2. **Code size.** "Chinese calendar in icu4swift is ~600 lines of
    Swift. ICU's `chnsecal.cpp` + `astro.cpp` is around 4,000 lines of
@@ -130,6 +136,7 @@ Three likely rabbit holes, and the one-sentence deflection for each:
 | "ICU handles this differently, are you sure you match?" | "Daily regression 1900–2100 against [authoritative source]. Zero divergences where I've measured. Known quirks I'd want to discuss case-by-case." |
 | "What about Hindu lunisolar performance?" | "Slow tier — ~3,500 µs/date, fully astronomical, not yet baked. The 20 of 22 other calendars are sub-3 µs. Baking design for lunisolar is a documented backlog item." |
 | "What about arithmetic calendars like Hebrew?" | "Foundation is 1.3–1.7× faster there today, both sides sub-3 µs. Swift micro-optimization headroom, not a design limit. Closeable with inlining and specialization work." |
+| "Can I see your benchmark methodology?" | "Release mode, 100k iterations, warm-up excluded, checksum to prevent dead-code elimination, **no assertion macros in the timed loop** (applies to perf benchmarks only — normal correctness tests use `#expect` freely). Swift Testing's `#expect` costs ~1.5 µs per call, which dominated our own measurements before we caught it. See `05-PerformanceParityGate.md` for the formal spec and `BENCHMARK_RESULTS.md` § 'The #expect overhead finding' for the cautionary tale." |
 
 Each deflection is "yes I've thought about this, but not in the next
 90 seconds."

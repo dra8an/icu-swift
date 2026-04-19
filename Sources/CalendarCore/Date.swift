@@ -22,6 +22,7 @@ public struct Date<C: CalendarProtocol>: Sendable {
     ///
     /// This is intended for use by `CalendarProtocol` implementations.
     /// Prefer `try_new` or calendar-specific factory methods instead.
+    @inlinable
     public init(inner: C.DateInner, calendar: C) {
         self.inner = inner
         self.calendar = calendar
@@ -122,11 +123,13 @@ public struct Date<C: CalendarProtocol>: Sendable {
     // MARK: - RataDie Conversion
 
     /// The `RataDie` (fixed day number) for this date.
+    @inlinable
     public var rataDie: RataDie {
         calendar.toRataDie(inner)
     }
 
     /// Creates a date from a `RataDie` value.
+    @inlinable
     public static func fromRataDie(_ rd: RataDie, calendar: C) -> Date<C> {
         let inner = calendar.fromRataDie(rd)
         return Date(inner: inner, calendar: calendar)

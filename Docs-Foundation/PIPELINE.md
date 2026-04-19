@@ -14,19 +14,25 @@ updated at session end (to signal what to pick up next time).
 
 ## In flight
 
-~~### 2 — Close the arithmetic-calendar perf gap~~ *(partial win, 2026-04-19)*
-**Hebrew closed to parity** (2.9 µs → 1.65 µs vs Foundation's 1.6 µs).
-Pattern that worked: `YearData` struct computed once per call,
-month-walk uses cached struct, integer arithmetic, `@inlinable` on
-hot paths. Persian also slightly improved (1.6 → 1.5) via binary
-search on correction table.
+~~### 2 — Close the arithmetic-calendar perf gap~~ *(resolved differently, 2026-04-19 PM)*
+**Turned out the premise was wrong.** The 1.3–1.7× "Foundation wins"
+number measured `#expect`-macro overhead, not calendar math.
+Standalone benchmarks show icu4swift at **5 ns** (Coptic), **22 ns**
+(Persian), **95 ns** (Hebrew) per round-trip — 10–300× faster than
+Foundation's public `Calendar` API at the low level.
 
-**Other arithmetic calendars (Coptic, Ethiopian, Indian, Japanese,
-Islamic×3) unchanged** — they don't have the same redundant
-computation Hebrew did. Remaining 0.3–0.4 µs gap vs Foundation is
-the "Swift tax" (generic `Date<C>` wrapper, protocol dispatch,
-module boundaries) — structural, not per-calendar. See new
-pipeline item #14 for closing that.
+Real story: our calendar math is dramatically faster; the
+end-to-end `Calendar`-API speedup depends on how much of that
+survives when we wrap icu4swift in Foundation's Calendar layer
+(Stage 1 of port).
+
+The Hebrew optimization from earlier still landed and is correct —
+it removed redundant `newYear` computation that WAS a real cost,
+just one that the `#expect`-overhead measurement masked.
+
+~~### 14 — Close the "Swift tax" floor~~ *(not needed)*
+The "Swift tax floor" hypothesis was wrong. Calendar-math overhead
+is already near machine speed. Removing this item from the pipeline.
 
 ## Items in the pipeline
 
@@ -167,21 +173,23 @@ caching at 1850.
 - **Unblocks:** small pitch-narrative improvement; may widen the
   perf moat on the one scenario where Foundation currently wins.
 
-### 14 — Close the "Swift tax" floor on simple arithmetic calendars
-The remaining ~0.3–0.4 µs gap on Persian/Coptic/Ethiopian/Indian/
-Japanese/Islamic×3 isn't per-calendar computation — it's the shared
-overhead of generic `Date<C>` construction, `CalendarProtocol`
-witness dispatch, and module-boundary costs. Investigate and close
-with one of: `@_specialize` annotations, concrete non-generic fast
-paths, inlinable public wrappers, or restructuring the
-`Date<C>.fromRataDie(_:calendar:)` API shape.
+### 15 — Build generic `YearCache<Data>` as shared infrastructure *(deferred from option B)*
+Not useful for current arithmetic calendars (their per-call compute
+is already ~nanoseconds, cache overhead would exceed the win). Useful
+for future work:
+- Refactor Chinese's bespoke `ChineseYearCache` to use this pattern.
+- Prep for observational Islamic (when added) — year compute is
+  genuinely expensive.
+- Prep for Hindu lunisolar baking (in pipeline).
 
-- **Delivers:** all-sub-1.5-µs arithmetic calendars; full parity
-  narrative in the pitch.
-- **Effort:** 1–3 days. Requires more experimentation than Hebrew
-  did (no single obvious culprit).
+Single generic `YearCache<Data>` with `os_unfair_lock` + LRU. Lives
+in `CalendarCore` or a shared utilities target.
+
+- **Delivers:** reusable infrastructure for calendars with
+  expensive year-level metadata.
+- **Effort:** half a day.
 - **Dependencies:** none.
-- **Unblocks:** stronger pitch framing.
+- **Unblocks:** cleaner Chinese code; new astronomical calendars.
 
 ### 13 — Extend `FoundationCalBench.swift` to macOS 26.0+ identifiers
 Wrap `dangi`, `bangla`, `tamil`, `malayalam`, `odia` in
@@ -203,7 +211,7 @@ A few natural constraints worth keeping in mind when rearranging:
 - **Items 3–8** (reference docs) have internal dependencies
   (5 → 6 → 7, 3 & 4 before 5).
 - **Items 9 and 10** (code work) should be preceded by item 6.
-- **Items 2, 11, 12, 13** are independent of the rest; fill time
+- **Items 11, 12, 13, 15** are independent of the rest; fill time
   between blocked items.
 
 ## Process

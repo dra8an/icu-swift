@@ -15,6 +15,40 @@ No external dependencies. Swift 6.0, strict concurrency enabled.
 
 **Always use `-c release`** for test runs — the Moshier VSOP87 calculations are 50x slower in debug mode (~2 minutes vs ~5 seconds).
 
+### Benchmarking discipline
+
+**Scope:** This rule applies to **performance tests and microbenchmarks only** — places where we report `ns/date`, `µs/date`, or any other per-operation timing number. For normal correctness tests that check a handful of conditions, `#expect` is fine and expected.
+
+**Never put `#expect` (or any Swift Testing / XCTest assertion macro) inside a timed hot loop.** Swift Testing's `#expect` macro costs ~1.5 µs per invocation even on the success path — it captures source location, builds an `__Expression` metadata value, allocates autoclosures, and crosses a module boundary into the `Testing` package. For microbenchmarks where the work-under-test is under ~10 µs, `#expect` completely dominates the measurement.
+
+Secondary concern: **large-scale regression tests** (tens of thousands of iterations) can spend most of their runtime inside `#expect` even when correctness is what's being measured. Example: our Hebrew regression (73,414 days vs Hebcal) takes ~320 ms; ~110 ms of that is `#expect` overhead. The test still passes correctly — it's just slower than it needs to be. If a regression test becomes slow enough to annoy, collect failures into an array during the loop and do one `#expect(failures.isEmpty)` at the end.
+
+Discovered the hard way 2026-04-19: our arithmetic-calendar benchmarks reported ~1.5 µs/date and it looked like "Foundation wins by 1.3–1.7×." The number was almost entirely `#expect` overhead. Without `#expect`, the real numbers were Coptic 5 ns, Persian 22 ns, Hebrew 95 ns per round-trip — 10–300× faster than Foundation's public Calendar API at the low level.
+
+**Correct bench shape** (use this pattern):
+
+```swift
+@Test("Benchmark: X")
+func benchX() {
+    let cal = X()
+    var checksum: Int64 = 0
+
+    // Warm-up (no timing)
+    for i in 0..<100 { ... accumulate into checksum ... }
+
+    let t0 = ProcessInfo.processInfo.systemUptime
+    for i in 0..<100_000 {
+        ... calendar work, accumulate into checksum ...
+    }
+    let elapsed = ProcessInfo.processInfo.systemUptime - t0
+
+    #expect(checksum != 0)   // ONE expectation, OUTSIDE the timed loop
+    print("  X: \(elapsed * 1e9 / 100_000) ns/date")
+}
+```
+
+The checksum must depend on the computed values (not just the inputs) so the optimizer cannot elide the work.
+
 ## Package Structure
 
 ```

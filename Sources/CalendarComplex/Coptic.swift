@@ -22,10 +22,12 @@ public struct Coptic: CalendarProtocol, Sendable {
         return CopticDateInner(year: extYear, month: month.number, day: day)
     }
 
+    @inlinable
     public func toRataDie(_ date: CopticDateInner) -> RataDie {
         CopticArithmetic.fixedFromCoptic(year: date.year, month: date.month, day: date.day)
     }
 
+    @inlinable
     public func fromRataDie(_ rd: RataDie) -> CopticDateInner {
         let (y, m, d) = CopticArithmetic.copticFromFixed(rd)
         return CopticDateInner(year: y, month: m, day: d)
@@ -91,9 +93,16 @@ public struct Coptic: CalendarProtocol, Sendable {
 
 /// Internal representation of a Coptic calendar date.
 public struct CopticDateInner: Equatable, Comparable, Hashable, Sendable {
-    let year: Int32
-    let month: UInt8  // 1-13
-    let day: UInt8
+    @usableFromInline let year: Int32
+    @usableFromInline let month: UInt8  // 1-13
+    @usableFromInline let day: UInt8
+
+    @inlinable
+    init(year: Int32, month: UInt8, day: UInt8) {
+        self.year = year
+        self.month = month
+        self.day = day
+    }
 
     public static func < (lhs: CopticDateInner, rhs: CopticDateInner) -> Bool {
         if lhs.year != rhs.year { return lhs.year < rhs.year }

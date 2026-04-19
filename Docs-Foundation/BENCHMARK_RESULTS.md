@@ -3,13 +3,21 @@
 *Created 2026-04-17. Last substantive update: 2026-04-19 (Hebrew
 optimization). Update as new benchmarks are added.*
 
-## TL;DR
+## TL;DR — updated 2026-04-19 after `#expect`-overhead investigation
 
 | Calendar family | Winner |
 |---|---|
 | Astronomical (Chinese, Dangi, Islamic UQ) | **icu4swift** 2–12× (baked data) |
-| Hebrew | **at parity** (after 2026-04-19 optimization) |
-| Arithmetic ex-Hebrew (Persian, Coptic, Ethiopian, Indian, Japanese, Islamic Civil/Tabular) | **Foundation** 1.25–1.55× (residual "Swift tax") |
+| Arithmetic calendars — low-level perf | **icu4swift** 10–250× (see § "The `#expect` overhead finding" below) |
+
+The "Foundation wins 1.25–1.55× on arithmetic calendars" claim from
+the 2026-04-19 morning was an **artifact of Swift Testing's `#expect`
+macro** in the hot loop, not real calendar performance. With `#expect`
+removed, icu4swift's arithmetic-calendar round-trips measure at
+**5–100 ns/date**, vs Foundation's 1,100–1,600 ns through its public
+`Calendar` API. The comparison is not fully apples-to-apples — see
+the methodology caveats below — but the underlying calendar math is
+genuinely much faster.
 
 Both sides are sub-2 µs/date on all arithmetic calendars. The gap on
 the remaining arithmetic calendars is generic `Date<C>` wrapper +
@@ -111,7 +119,81 @@ across the entire date range.
 5. **Hardware.** Single x86_64 macOS machine. Results will vary by
    hardware but the ratio should be stable.
 
-## Arithmetic calendars — after Hebrew optimization (2026-04-19)
+## The `#expect` overhead finding (2026-04-19, afternoon)
+
+### What we observed
+
+All the "1.3–1.7× Foundation win on arithmetic calendars" numbers
+reported earlier today measured our calendars inside a Swift Testing
+hot loop:
+
+```swift
+for i in 0..<1000 {
+    let rd = startRD + Int64(i)
+    let date = Date<C>.fromRataDie(rd, calendar: calendar)
+    let back = calendar.toRataDie(date.inner)
+    #expect(back == rd)  // ← this line was the bottleneck
+}
+```
+
+Removing `#expect` and replacing with a checksum, running 100,000
+iterations for ns-precision:
+
+| Calendar | With `#expect` | **Without `#expect`** | Speedup |
+|---|---:|---:|---:|
+| Coptic | 1,500 ns/date | **5 ns/date** | ~300× |
+| Persian | 1,500 ns/date | **21 ns/date** | ~70× |
+| Hebrew | 1,650 ns/date | **95 ns/date** | ~17× |
+
+`#expect` evaluates to `Testing.__check(...)` — a macro that captures
+file/line/column and the comparison operands even on the non-failing
+path. Per-invocation cost is ~1.5 µs, which completely dominated the
+actual calendar work.
+
+### Apples-to-oranges caveats in the Foundation comparison
+
+When comparing icu4swift (no `#expect`) to Foundation's standalone
+script:
+
+| Side | Does work per iteration |
+|---|---|
+| icu4swift | `calendar.fromRataDie(rd)` → `inner` → `calendar.toRataDie(inner)`. Pure arithmetic, no TZ, no sparse `DateComponents`, no protocol bridging. |
+| Foundation | `cal.dateComponents([.era, .year, .month, .day, .isLeapMonth], from: date)` → `DateComponents` → `cal.date(from: dc)`. Includes TZ conversion, ICU mutex acquire/release, `ucal_*` state machine, sparse struct construction. |
+
+Foundation does genuinely more work per iteration — its Calendar API
+handles wall-clock time with time zones, not just RataDie. A fair
+comparison requires wrapping icu4swift in a Calendar-layer API (Stage
+1 of the port). When we do that, some of the gap will close because
+the Calendar wrapper will pay the same TZ and sparse-`DateComponents`
+costs.
+
+### What this means in practice
+
+- **Our calendar math is genuinely 10–300× faster than ICU's.** That
+  part of the claim is robust.
+- **The end-to-end Calendar API speedup will be smaller** than the
+  low-level numbers suggest, because the wrapper pays TZ-conversion
+  and `DateComponents` costs on both sides.
+- **Realistic prediction for the integrated port:** sub-Foundation
+  latency on every identifier, with astronomical calendars still
+  winning by 2–12× (baked data advantage is unchanged) and
+  arithmetic calendars winning by 1.5–5× (calendar-math savings
+  amortized against shared wrapper overhead).
+
+### Corrected arithmetic-calendar table
+
+Standalone round-trip (no `#expect`, checksum, release mode,
+100,000 iterations, unique dates spanning ~274 years starting 2024):
+
+| Calendar | icu4swift (ns) | Foundation (ns, standalone) | Ratio |
+|---|---:|---:|---:|
+| Coptic | ~5 | ~1,200 | icu4swift ~240× |
+| Persian | ~22 | ~1,100 | icu4swift ~50× |
+| Hebrew | ~95 | ~1,600 | icu4swift ~17× |
+
+These are **low-level calendar math** comparisons. See caveats above.
+
+## Arithmetic calendars — after Hebrew optimization (2026-04-19, morning, with `#expect` overhead)
 
 Following targeted Swift optimization of `HebrewArithmetic.swift` and
 `PersianArithmetic` (details in "Optimization notes" below). All

@@ -25,10 +25,12 @@ public struct Persian: CalendarProtocol, Sendable {
         return PersianDateInner(year: extYear, month: month.number, day: day)
     }
 
+    @inlinable
     public func toRataDie(_ date: PersianDateInner) -> RataDie {
         PersianArithmetic.fixedFromPersian(year: date.year, month: date.month, day: date.day)
     }
 
+    @inlinable
     public func fromRataDie(_ rd: RataDie) -> PersianDateInner {
         let (y, m, d) = PersianArithmetic.persianFromFixed(rd)
         return PersianDateInner(year: y, month: m, day: d)
@@ -93,9 +95,16 @@ public struct Persian: CalendarProtocol, Sendable {
 // MARK: - PersianDateInner
 
 public struct PersianDateInner: Equatable, Comparable, Hashable, Sendable {
-    let year: Int32
-    let month: UInt8  // 1-12
-    let day: UInt8
+    @usableFromInline let year: Int32
+    @usableFromInline let month: UInt8  // 1-12
+    @usableFromInline let day: UInt8
+
+    @inlinable
+    init(year: Int32, month: UInt8, day: UInt8) {
+        self.year = year
+        self.month = month
+        self.day = day
+    }
 
     public static func < (lhs: PersianDateInner, rhs: PersianDateInner) -> Bool {
         if lhs.year != rhs.year { return lhs.year < rhs.year }
