@@ -23,7 +23,8 @@ Read-and-update throughout the project. Keep them current.
 | **`MASTER.md`** | This file — index of every document here and what it is for. |
 | **`PROJECT_PLAN.md`** | High-level roadmap: the four stages of the port, phases within each, and acceptance criteria. The answer to "what are we doing and in what order". |
 | **`STATUS.md`** | Current state: which docs exist, which calendars are ported, which perf baselines are captured, what is in flight vs. complete. Updated at each checkpoint. |
-| **`NEXT.md`** | Near-term pipeline: immediate next tasks in priority order. Updated whenever work shifts. |
+| **`NEXT.md`** | The **single focused next task** to pick up at session start. **Updated only at session end.** |
+| **`PIPELINE.md`** | The **full pipeline** of candidate tasks. **Updated freely during a session** — strike through finished items, add new candidates at the bottom, rearrange priorities. |
 | **`OPEN_ISSUES.md`** | Project-level risks and concerns: stakeholder alignment, ICU quirks, perf unknowns, scope creep. Updated when issues resolve or new ones emerge. Distinct from `07-OpenQuestions.md`, which holds stakeholder-decision items. |
 | **`PITCH.md`** | The plan for pitching this project to the `swift-foundation` team in a 3–5 minute window. Four-beat structure, proof points, anti-stranding rules, pre-pitch checklist. |
 | **`BENCHMARK_RESULTS.md`** | Measured benchmark results comparing icu4swift against Foundation. Currently has Chinese calendar (icu4swift 7–8× faster). Grows as more calendars are measured. |
@@ -39,7 +40,7 @@ Written once per topic; updated only when the design changes.
 | **`02-ICUSurfaceToReplace.md`** *(planned)* | The 17 `ucal_*` functions `_CalendarICU` calls, the C++ classes behind them, what icu4swift must match behaviorally. |
 | **`03-CoverageAndSemanticsGap.md`** *(planned)* | Diagnosis: identifier map (Foundation × ICU upstream × swift-foundation-icu fork × icu4swift), capability gaps icu4swift must close. |
 | **`04-icu4swiftGrowthPlan.md`** *(planned)* | **Stage 1 roadmap.** How icu4swift grows to cover Foundation semantics (TZ awareness, firstWeekday, range/ordinality/dateInterval, nextDate/enumerateDates, sparse DateComponents). Phased plan with its own acceptance criteria. |
-| **`05-PerformanceParityGate.md`** *(planned)* | Benchmark design, baseline-capture protocol, per-calendar per-operation thresholds. Crosscuts every stage. |
+| **`05-PerformanceParityGate.md`** | Benchmark design, baseline-capture protocol, per-calendar per-operation thresholds. Proposes 3-level gate (PR, port, release), per-metric thresholds, rollout procedure. Crosscuts every stage. |
 | **`06-FoundationPortPlan.md`** *(planned)* | **Stages 2–4 roadmap.** Calendar-by-calendar port into `swift-foundation` in risk order; per-calendar acceptance gate. |
 | **`07-OpenQuestions.md`** *(planned)* | Alignment items needing stakeholder decisions before we commit to specifics. |
 | **`MigrationIssues.md`** | Design clarifications on two early concerns (Foundation mutability, RataDie vs. millisecond time basis) that turned out to be non-issues. Captures reasoning so it is not lost. |

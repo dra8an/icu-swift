@@ -125,7 +125,7 @@ Three likely rabbit holes, and the one-sentence deflection for each:
 | If they ask… | Say… |
 |---|---|
 | "How do you handle [specific calendar edge case]?" | "I'd rather agree on direction first — happy to go deep on any calendar in a follow-up." |
-| "How would you prove no perf regression?" | "Per-calendar benchmarks capturing the ICU baseline before the port, locked thresholds, parity-or-revert per PR. I have a design doc ready." |
+| "How would you prove no perf regression?" | "Three-level parity gate — per-PR, per-calendar port, per-release. Thresholds on CPU mean, P99, mallocs, throughput, peak memory. Baseline JSON checked into the repo, re-captured only on ICU / toolchain / hardware changes. Design in `05-PerformanceParityGate.md`, happy to walk through it." |
 | "ICU handles this differently, are you sure you match?" | "Daily regression 1900–2100 against [authoritative source]. Zero divergences where I've measured. Known quirks I'd want to discuss case-by-case." |
 | "What about Hindu lunisolar performance?" | "Slow tier — ~3,500 µs/date, fully astronomical, not yet baked. The 20 of 22 other calendars are sub-3 µs. Baking design for lunisolar is a documented backlog item." |
 | "What about arithmetic calendars like Hebrew?" | "Foundation is 1.3–1.7× faster there today, both sides sub-3 µs. Swift micro-optimization headroom, not a design limit. Closeable with inlining and specialization work." |

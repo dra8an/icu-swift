@@ -26,7 +26,8 @@ Durable design + reference docs:
 | `MASTER.md` | written |
 | `PROJECT_PLAN.md` | written |
 | `STATUS.md` | written (this file) |
-| `NEXT.md` | written |
+| `NEXT.md` | written (single-task focus) |
+| `PIPELINE.md` | written |
 | `OPEN_ISSUES.md` | written |
 | `PITCH.md` | written |
 | `TIMEZONE_CONSIDERATION.md` | written |
@@ -37,7 +38,7 @@ Durable design + reference docs:
 | `02-ICUSurfaceToReplace.md` | not started |
 | `03-CoverageAndSemanticsGap.md` | not started |
 | `04-icu4swiftGrowthPlan.md` | not started |
-| `05-PerformanceParityGate.md` | not started |
+| `05-PerformanceParityGate.md` | written |
 | `06-FoundationPortPlan.md` | not started |
 | `07-OpenQuestions.md` | not started |
 
@@ -121,3 +122,9 @@ is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
   22 calendars sub-3 µs, Hindu lunisolar is the slow tier. Scripts:
   `Scripts/FoundationChineseBench.swift`,
   `Scripts/FoundationCalBench.swift`.
+- 2026-04-19 — `05-PerformanceParityGate.md` written.
+  Three-level gate (PR merge, per-calendar port, per-release),
+  per-metric thresholds (CPU mean ±10 %, P99 ±20 %, mallocs ≤ 0,
+  throughput ±10 %), per-calendar rollout procedure, CI
+  integration, rollback protocol, open questions for
+  `swift-foundation` maintainers.
