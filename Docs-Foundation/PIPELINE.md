@@ -191,6 +191,51 @@ in `CalendarCore` or a shared utilities target.
 - **Dependencies:** none.
 - **Unblocks:** cleaner Chinese code; new astronomical calendars.
 
+~~### 16 — Re-run all perf tests with clean methodology~~ *(done 2026-04-19 PM)*
+All five benchmark files refactored to no-`#expect` pattern (100k
+iterations, warm-up excluded, checksum, single `#expect` after).
+Clean sweep captured in `BENCHMARK_RESULTS.md`. Headline: icu4swift
+is 17–285× faster than Foundation's `Calendar` API on every
+measurable identifier. Chinese is the biggest win at ~285×.
+
+### 17 — Direct ICU4C benchmark for apples-to-apples comparison
+Our current comparison is **icu4swift raw RataDie round-trip** vs
+**Foundation's public `Calendar` API**. Foundation's API includes
+TZ conversion, sparse `DateComponents` construction, and mutex-gated
+ICU state-machine calls — genuinely more work per iteration than our
+bench measures. The honest comparison is against **ICU4C's calendar
+math directly**, skipping the Swift/Foundation wrapper.
+
+Scope:
+- Write a small C++ (or C) benchmark using ICU4C's `ucal_*` API
+  directly: `ucal_open`, `ucal_setMillis`, `ucal_get` × fields,
+  `ucal_clear`, `ucal_set` × fields, `ucal_getMillis`. Same
+  round-trip semantics as our Swift bench.
+- Use the ICU sources at `/Users/draganbesevic/Projects/claude/icu/icu4c/`
+  (upstream) and optionally `swift-foundation-icu`'s fork.
+- Same shape: 100k iterations, same date range (2024+), warm-up
+  excluded, checksum.
+- Per-calendar coverage: at minimum gregorian, hebrew, chinese,
+  coptic, persian, islamic, japanese. Extend as needed.
+- Build a **three-way table** in `BENCHMARK_RESULTS.md`:
+  - icu4swift (raw calendar math)
+  - **ICU4C direct** (raw C++ calendar math)
+  - Foundation `Calendar` (Swift wrapper on top of ICU4C)
+- Analyze the spread: what fraction of Foundation's cost is
+  `_CalendarICU` bridge vs ICU's actual math.
+
+- **Delivers:** definitive answer to "is our underlying calendar
+  math actually faster than ICU's?" Removes the apples-to-oranges
+  framing from the pitch. Also quantifies how much the Swift wrapper
+  Foundation uses adds on top of ICU4C, which informs Stage 1 of
+  the port (we'll pay similar costs when we wrap icu4swift).
+- **Effort:** 1–2 days. Requires a bit of ICU4C build configuration
+  and C++ knowledge.
+- **Dependencies:** ICU4C source cloned (already done). Working C++
+  compiler + ICU library link path.
+- **Unblocks:** the strongest-possible pitch framing; full
+  methodology transparency.
+
 ### 13 — Extend `FoundationCalBench.swift` to macOS 26.0+ identifiers
 Wrap `dangi`, `bangla`, `tamil`, `malayalam`, `odia` in
 `@available(macOS 26, *)` and add them to the benchmark matrix.
@@ -211,8 +256,12 @@ A few natural constraints worth keeping in mind when rearranging:
 - **Items 3–8** (reference docs) have internal dependencies
   (5 → 6 → 7, 3 & 4 before 5).
 - **Items 9 and 10** (code work) should be preceded by item 6.
-- **Items 11, 12, 13, 15** are independent of the rest; fill time
+- **Items 11, 12, 13, 15, 16, 17** are independent of the rest; fill time
   between blocked items.
+- **Items 16 and 17** both materially improve pitch numbers — 16
+  gives us clean across-the-board data; 17 removes the
+  apples-to-oranges concern. Both good to land before the pitch
+  conversation happens.
 
 ## Process
 

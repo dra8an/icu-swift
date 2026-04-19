@@ -27,7 +27,7 @@ Read-and-update throughout the project. Keep them current.
 | **`PIPELINE.md`** | The **full pipeline** of candidate tasks. **Updated freely during a session** — strike through finished items, add new candidates at the bottom, rearrange priorities. |
 | **`OPEN_ISSUES.md`** | Project-level risks and concerns: stakeholder alignment, ICU quirks, perf unknowns, scope creep. Updated when issues resolve or new ones emerge. Distinct from `07-OpenQuestions.md`, which holds stakeholder-decision items. |
 | **`PITCH.md`** | The plan for pitching this project to the `swift-foundation` team in a 3–5 minute window. Four-beat structure, proof points, anti-stranding rules, pre-pitch checklist. |
-| **`BENCHMARK_RESULTS.md`** | Measured benchmark results comparing icu4swift against Foundation. Currently has Chinese calendar (icu4swift 7–8× faster). Grows as more calendars are measured. |
+| **`BENCHMARK_RESULTS.md`** | Measured benchmark results comparing icu4swift against Foundation. Clean sweep across all 22 calendars (2026-04-19 PM): icu4swift is 17–285× faster than Foundation's `Calendar` API. Apples-to-oranges caveat documented inside. |
 
 ## Design & reference documents
 

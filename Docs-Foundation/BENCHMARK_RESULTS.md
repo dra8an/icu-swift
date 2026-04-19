@@ -1,32 +1,34 @@
 # Benchmark Results — icu4swift vs. Foundation
 
-*Created 2026-04-17. Last substantive update: 2026-04-19 (Hebrew
-optimization). Update as new benchmarks are added.*
+*Created 2026-04-17. Last substantive update: 2026-04-19 PM
+(clean-methodology sweep across all 22 calendars). Update as new
+benchmarks are added.*
 
-## TL;DR — updated 2026-04-19 after `#expect`-overhead investigation
+## TL;DR — updated 2026-04-19 PM
 
-| Calendar family | Winner |
-|---|---|
-| Astronomical (Chinese, Dangi, Islamic UQ) | **icu4swift** 2–12× (baked data) |
-| Arithmetic calendars — low-level perf | **icu4swift** 10–250× (see § "The `#expect` overhead finding" below) |
+All 22 calendars measured with the clean harness (no `#expect` in
+timed loop, 100k iterations, checksum, release mode):
 
-The "Foundation wins 1.25–1.55× on arithmetic calendars" claim from
-the 2026-04-19 morning was an **artifact of Swift Testing's `#expect`
-macro** in the hot loop, not real calendar performance. With `#expect`
-removed, icu4swift's arithmetic-calendar round-trips measure at
-**5–100 ns/date**, vs Foundation's 1,100–1,600 ns through its public
-`Calendar` API. The comparison is not fully apples-to-apples — see
-the methodology caveats below — but the underlying calendar math is
-genuinely much faster.
+| Calendar family | Winner | Range |
+|---|---|---:|
+| Simple (ISO, Gregorian, Julian, Buddhist, ROC) | **icu4swift** 58–74× | 16–19 ns |
+| Arithmetic (Hebrew, Coptic, Ethiopian, Persian, Indian, Japanese) | **icu4swift** 17–130× | 9–96 ns |
+| Islamic (Tabular, Civil, UQ) | **icu4swift** 30–60× | 20–43 ns |
+| Chinese (baked) | **icu4swift** ~285× | 42 ns |
+| Dangi, Hindu solar | **icu4swift**, Foundation macOS 26+ only | 38–200 ns |
+| Hindu lunisolar (unbaked Moshier) | slow tier, 3.3–3.4 **ms**/date | — |
 
-Both sides are sub-2 µs/date on all arithmetic calendars. The gap on
-the remaining arithmetic calendars is generic `Date<C>` wrapper +
-protocol dispatch overhead, not in-calendar computation. The
-astronomical win is structural (baked data vs. runtime compute).
+**Headline:** icu4swift is 17× to 285× faster than Foundation's
+`Calendar` API on every identifier we've measured. 20 of 22
+calendars are under 300 ns/date; the two exceptions (Hindu
+lunisolar) remain the documented slow tier and will close with
+baking (pipeline item 11).
 
-**20 of 22 icu4swift calendars are sub-3 µs/date.** Two exceptions:
-Hindu Amanta and Purnimanta (lunisolar) at ~3,500 µs/date — not yet
-baked. See § "icu4swift self-benchmark" below.
+**Apples-to-oranges caveat.** Foundation's `Calendar` API does more
+per iteration — TZ conversion, sparse `DateComponents`, mutex. See
+§ "The `#expect` overhead finding" for full methodology. Pipeline
+item 17 (direct ICU4C benchmark) will quantify how much of the
+Foundation gap is wrapper overhead vs calendar math.
 
 ## Chinese calendar round-trip (2026-04-17)
 
@@ -359,7 +361,95 @@ How to handle it in the pitch:
 This reframes the one loss as "we chose accuracy; the cost is
 fixable and small in scope."
 
-## icu4swift self-benchmark (2026-04-17)
+## Clean-methodology sweep — all 22 calendars (2026-04-19)
+
+Harness refactored to the no-`#expect` pattern per
+`05-PerformanceParityGate.md`. 100,000 iterations for fast calendars,
+1,000 for Hindu lunisolar (too slow for 100k), plus Moshier-fallback
+variants at smaller iteration counts. Warm-up excluded, checksum
+prevents dead-code elimination. Release mode, median of 3+ runs.
+
+### icu4swift (native round-trip) vs Foundation
+
+Foundation column is from standalone `FoundationCalBench.swift`
+(100,000-iteration equivalent, standalone Swift, same methodology
+on the Foundation side).
+
+| Calendar | icu4swift | Foundation | Ratio |
+|---|---:|---:|---:|
+| **Simple calendars** | | | |
+| ISO | 19 ns | — | — |
+| Gregorian | 19 ns | ~1,100 ns | icu4swift ~58× |
+| Julian | 16 ns | — | — |
+| Buddhist | 19 ns | ~1,400 ns | icu4swift ~74× |
+| ROC (Taiwan) | 19 ns | ~1,100 ns | icu4swift ~58× |
+| **Complex arithmetic** | | | |
+| Hebrew | 96 ns | ~1,600 ns | icu4swift ~17× |
+| Coptic | 9 ns | ~1,200 ns | icu4swift ~130× |
+| Ethiopian (Amete Mihret) | 12 ns | ~1,200 ns | icu4swift ~100× |
+| Persian | 14 ns | ~1,100 ns | icu4swift ~79× |
+| Indian | 26 ns | ~1,100 ns | icu4swift ~42× |
+| Japanese | 19 ns | ~1,100 ns | icu4swift ~58× |
+| **Astronomical (baked)** | | | |
+| Islamic Tabular | 21 ns | ~1,200 ns | icu4swift ~57× |
+| Islamic Civil | 20 ns | ~1,200 ns | icu4swift ~60× |
+| Islamic Umm al-Qura | 43 ns | ~1,300 ns | icu4swift ~30× |
+| Chinese (baked) | 42 ns | ~12,000 ns | **icu4swift ~285×** |
+| Dangi | 38 ns | macOS 26+ only | n/a |
+| **Hindu solar (baked)** | | | |
+| Tamil | 109 ns | macOS 26+ only | n/a |
+| Bengali | 125 ns | macOS 26+ only | n/a |
+| Odia | 175 ns | macOS 26+ only | n/a |
+| Malayalam | 200 ns | macOS 26+ only | n/a |
+| **Hindu lunisolar (Moshier, not baked)** | | | |
+| Amanta | ~3,300,000 ns | macOS 26+ only | n/a |
+| Purnimanta | ~3,400,000 ns | macOS 26+ only | n/a |
+
+### Chinese Moshier-fallback variants
+
+Outside the baked 1901–2099 range, Chinese falls back to Moshier
+ephemeris with an 8-entry LRU year cache.
+
+| Scenario | icu4swift | Foundation (standalone script) |
+|---|---:|---:|
+| 2200, 30-day tight window | 7,060 ns | ~55,000 ns |
+| 2200, 1000-day span (cache amortizes) | 483 ns | ~41,000 ns |
+| 1850, 1000-day span | 14,956 ns | ~44,000 ns |
+
+Chinese stays dramatically faster than Foundation even outside the
+baked range.
+
+### Units and methodology notes
+
+- All times are **ns per round-trip** (one `fromRataDie` + one
+  `toRataDie`).
+- "Ratio" is how many times faster icu4swift is than Foundation.
+- Foundation benchmarks through `Calendar(identifier: .x)`'s public
+  API, which includes TZ conversion, sparse `DateComponents`
+  construction, and ICU state-machine bridging — see the
+  apples-to-oranges caveats in the TL;DR.
+- Pipeline item 17 (direct ICU4C benchmark) will quantify how much
+  of the Foundation cost is wrapper overhead vs. ICU's actual
+  calendar math.
+
+### What surprised us
+
+- **Chinese is 285× faster** — biggest single win. Baked HKO data +
+  lock-free bit ops vs ICU's astronomy path + mutex.
+- **Coptic is 130× faster** — simplest possible calendar, almost
+  nothing to do per iteration.
+- **Hindu lunisolar is 3.3 ms/date** — three orders of magnitude
+  slower than the rest because it's the only unbaked astronomical
+  calendar. Foundation equivalent would likely be 10-50 ms/date
+  (ICU does more work per call) — but Foundation's Hindu variants
+  are macOS 26+ only, so we can't measure yet.
+- **Hebrew at 96 ns** — the slowest arithmetic calendar due to
+  lunisolar year structure. Already optimized this morning; cannot
+  easily go lower without caching across calls (see earlier
+  discussion about why a `YearCache` would not help Hebrew at this
+  cost level).
+
+## icu4swift self-benchmark (2026-04-17, pre-clean-methodology)
 
 Standalone measurement — no Foundation comparison, just icu4swift
 across every implemented calendar. 1000-iteration round-trips

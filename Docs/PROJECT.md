@@ -100,7 +100,7 @@ External reference data:
 - Every calendar validated against at least one independent external source (Foundation, Hebcal, convertdate, HKO, KACST, or official government data).
 - Chinese at **2,458 / 2,461** vs Hong Kong Observatory — one 3-failure cluster in 1906, accepted as a known Moshier-vs-HKO physical disagreement.
 - All others at **100% accuracy** across their regression ranges.
-- Performance: **~2–4 µs/date** for all arithmetic and baked-table calendars. Only Hindu lunisolar (not baked) is slower (~3,900 µs/date).
+- Performance (clean-methodology, 2026-04-19 PM): **9–200 ns/date** for all arithmetic and baked-table calendars. Only Hindu lunisolar (not baked) is slower (~3.3 ms/date). Pre-2026-04-19 baselines reported 2–4 µs; that was `#expect`-macro overhead inside the hot loop, not real calendar cost. See `Docs-Foundation/BENCHMARK_RESULTS.md`.
 
 See `Docs/TestCoverageAndDocs.md` for the full per-calendar index.
 

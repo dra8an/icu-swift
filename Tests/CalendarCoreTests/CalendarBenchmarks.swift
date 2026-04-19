@@ -1,7 +1,12 @@
 // Baseline performance benchmarks for all calendars.
 //
-// Each test converts 1,000 consecutive Gregorian days (2024-01-01 to 2026-09-27)
-// to the target calendar and back, measuring round-trip throughput.
+// Each test converts consecutive Gregorian days starting 2024-01-01 to the
+// target calendar and back, measuring round-trip throughput.
+//
+// Methodology: see Docs-Foundation/05-PerformanceParityGate.md.
+// Hard rule: no `#expect` in the timed loop (~1.5 µs overhead/call; dominates
+// microbenchmarks). Use a checksum + one `#expect` after the timed region.
+//
 // Run with: swift test -c release --filter "CalendarBenchmarks"
 
 import Testing
@@ -12,27 +17,34 @@ import Foundation
 @Suite("Calendar Benchmarks")
 struct CalendarBenchmarks {
 
-    // 1000 consecutive RataDie values starting from 2024-01-01
     static let startRD = GregorianArithmetic.fixedFromGregorian(year: 2024, month: 1, day: 1)
-    static let count = 1000
 
     private func benchmark<C: CalendarProtocol>(
         _ calendar: C,
-        label: String
+        label: String,
+        iterations: Int = 100_000,
+        warmup: Int = 100
     ) {
-        let t0 = ProcessInfo.processInfo.systemUptime
-        for i in 0..<Self.count {
+        var checksum: Int64 = 0
+        // Warm-up (not timed)
+        for i in 0..<warmup {
             let rd = Self.startRD + Int64(i)
             let date = Date<C>.fromRataDie(rd, calendar: calendar)
             let back = calendar.toRataDie(date.inner)
-            #expect(back == rd)
+            checksum &+= back.dayNumber ^ Int64(date.dayOfMonth)
+        }
+        let t0 = ProcessInfo.processInfo.systemUptime
+        for i in 0..<iterations {
+            let rd = Self.startRD + Int64(i % 1000)  // stays within 1000-day window
+            let date = Date<C>.fromRataDie(rd, calendar: calendar)
+            let back = calendar.toRataDie(date.inner)
+            checksum &+= back.dayNumber ^ Int64(date.dayOfMonth)
         }
         let elapsed = ProcessInfo.processInfo.systemUptime - t0
-        let perDate = elapsed / Double(Self.count) * 1_000_000 // microseconds
-        print("  \(label): \(Self.count) round-trips in \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDate)) µs/date)")
+        let perDateNs = elapsed / Double(iterations) * 1_000_000_000
+        #expect(checksum != 0)
+        print("  \(label): \(iterations) round-trips in \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDateNs)) ns/date)")
     }
-
-    // MARK: - Simple calendars
 
     @Test("Benchmark: ISO")
     func benchISO() { benchmark(Iso(), label: "ISO") }

@@ -92,11 +92,17 @@ the formal Stage 0 gate, but enough to de-risk the pitch.
 | Chinese (Moshier, 2200, 1000d) | 3.4 µs | ~41 µs | ✓ (icu4swift 12× faster) |
 | Chinese (Moshier, 1850, 1000d) | 26 µs | ~44 µs | ✓ (icu4swift 1.7× faster) |
 | Chinese (Moshier, 1850, 30d) | 357 µs | ~30 µs | ✓ (**Foundation 12× faster** — narrow window) |
-| Arithmetic (Hebrew, Persian, Coptic, Ethiopian, Indian, Japanese, Islamic×3) | 1.5–2.9 µs | 1.1–1.6 µs | ✓ (Foundation 1.3–1.7× faster) |
-| Hindu lunisolar (Amanta, Purnimanta) | ~3,500 µs | ? (macOS 26.0+) | partial (icu4swift only) |
+| Simple (ISO, Gregorian, Julian, Buddhist, ROC) | 16–19 ns | ~1,100–1,400 ns | ✓ (icu4swift 58–74× faster) |
+| Arithmetic (Hebrew, Coptic, Ethiopian, Persian, Indian, Japanese) | 9–96 ns | ~1,100–1,600 ns | ✓ (icu4swift 17–130× faster) |
+| Islamic (Tabular, Civil, UQ) | 20–43 ns | ~1,200–1,300 ns | ✓ (icu4swift 30–60× faster) |
+| Chinese (baked) | 42 ns | ~12,000 ns | ✓ (icu4swift ~285× faster) |
+| Dangi, Hindu solar | 38–200 ns | macOS 26+ only | icu4swift only |
+| Hindu lunisolar (Amanta, Purnimanta) | ~3.3 ms | macOS 26+ only | partial (icu4swift only) |
 
-**icu4swift self-bench:** 20 of 22 calendars sub-3 µs; Hindu
-lunisolar is the slow tier.
+**All 2026-04-19 PM measurements are with the clean harness** —
+no `#expect` in the timed loop, 100k iterations, checksum. Earlier
+numbers in this file (1.5–2.9 µs range) were `#expect`-overhead
+artifacts.
 
 Formal Stage 0 (per-calendar ICU baseline capture within
 `swift-foundation`'s benchmark harness) is still pending.
@@ -128,3 +134,10 @@ is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
   throughput ±10 %), per-calendar rollout procedure, CI
   integration, rollback protocol, open questions for
   `swift-foundation` maintainers.
+- 2026-04-19 PM — Hebrew optimization (2.9 µs → 1.65 µs pre-cleanup;
+  later discovered to be 96 ns after removing `#expect` overhead).
+  `#expect`-in-timed-loop issue discovered and documented. Benchmark
+  harness refactored across all 5 bench files. Clean sweep across
+  all 22 calendars: icu4swift is 17–285× faster than Foundation's
+  public Calendar API. `BENCHMARK_RESULTS.md` updated. PIPELINE
+  items 16 (clean bench) done; 17 (direct ICU4C comparison) added.

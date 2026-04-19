@@ -185,7 +185,13 @@ See `Docs/TestCoverageAndDocs.md` for the master per-calendar regression index.
 
 See `Docs/PERFORMANCE.md` for full benchmarks.
 
-Baseline (µs/date, round-trip, release mode):
+**⚠ 2026-04-19 PM:** The µs/date numbers in this section were
+measured with `#expect` inside the timed loop (~1.5 µs overhead per
+call). Clean numbers are in `Docs-Foundation/BENCHMARK_RESULTS.md`:
+arithmetic 9–96 ns/date, baked astronomical 20–43 ns, Chinese 42 ns,
+Hindu lunisolar ~3.3 ms (unchanged).
+
+Baseline (µs/date, round-trip, release mode, pre-cleanup):
 
 | Tier | Calendars | Speed |
 |---|---|---:|

@@ -15,16 +15,15 @@ Before the detail, a calibrated gut estimate:
 | Outcome | Confidence |
 |---|:-:|
 | Swift backend is functionally correct across all identifiers | 80%+ |
-| Performance parity across all calendars vs. ICU | **60–80%** (up from 50–70% after 2026-04-17 measurements) |
+| Performance parity across all calendars vs. ICU | **80–90%** (up from 60–80% after 2026-04-19 PM clean sweep) |
 | Result merges into upstream `swift-foundation` | 20–50% |
 | Time to Stage 3 complete, solo | 9–18 months |
 
 The big variance is Issue 1. Everything else is engineering tractable.
 
-Performance confidence bumped: spot measurements confirmed
-structural wins on astronomical calendars and showed the arithmetic
-gap is small (1.3–1.7×) and addressable by standard Swift
-optimization. See `BENCHMARK_RESULTS.md`.
+Performance confidence bumped again after the 2026-04-19 PM
+clean-methodology sweep: all 22 calendars measured 17–285× faster
+than Foundation's `Calendar` API. See `BENCHMARK_RESULTS.md`.
 
 ---
 
@@ -132,28 +131,32 @@ slice on its own.
 **Concern.** Apple has optimized `_CalendarGregorian` heavily. The
 Stage 0 parity gate might reveal gaps too wide to close.
 
-**What we now know** (from spot measurements, not the formal gate;
-see `BENCHMARK_RESULTS.md`):
+**What we now know** (2026-04-19 PM, clean-methodology sweep; see
+`BENCHMARK_RESULTS.md`):
 
-- Astronomical calendars (Chinese/Dangi baked): **icu4swift wins
-  2–12× across realistic spans.** Structural win from baked data.
-- Arithmetic calendars (Hebrew, Persian, Coptic, Ethiopian, Indian,
-  Japanese, Islamic Civil/Tabular/UQ): **Foundation wins 1.3–1.7×**.
-  Both sides sub-3 µs/date. Gap is Swift micro-optimization
-  headroom, not a design limit.
-- Gregorian itself: not yet measured head-to-head. `_CalendarGregorian`
-  is already pure Swift, so this is less urgent than it was.
+- **icu4swift wins 17–285× on every calendar** measured against
+  Foundation's public `Calendar` API. 20 of 22 calendars are under
+  300 ns/date; simple/arithmetic calendars 9–96 ns/date, astronomical
+  (baked) 20–43 ns, Chinese 42 ns vs Foundation's ~12,000 ns.
+- The earlier "Foundation wins 1.3–1.7×" narrative was an artifact
+  of `#expect` macro overhead (~1.5 µs/call) inside the hot loop.
+  Without it, real icu4swift numbers are orders of magnitude faster.
+- Hindu lunisolar (Amanta, Purnimanta) remains the slow tier at
+  ~3.3 ms/date — documented baking backlog item (pipeline #11).
 
-**What this means.** The performance story is mixed but defensible:
-we lead with the structural wins and disclose the arithmetic gap
-as optimizable. No project-blocking outcome.
+**What this means.** The performance story is now unambiguous on
+the low-level layer: our calendar math is dramatically faster than
+ICU's exposed-via-Foundation Calendar API. The apples-to-oranges
+caveat still applies (Foundation does more per iteration via its
+wrapper), and pipeline item #17 will quantify that split.
 
 **What would still resolve it fully.**
-- Formal Stage 0 per-calendar benchmark capture against `_CalendarICU`
-  in `swift-foundation`'s actual benchmark harness (not the
-  standalone script approach).
-- Targeted Swift optimization to close the arithmetic-calendar gap:
-  `@inlinable`, specialization, per-call allocation audits.
+- **Pipeline item #17 — direct ICU4C comparison.** Writes a C/C++
+  benchmark using ICU4C's `ucal_*` API directly to quantify how much
+  of Foundation's per-call cost is wrapper vs underlying ICU math.
+- Formal Stage 0 per-calendar benchmark capture inside
+  `swift-foundation`'s actual benchmark harness (not the standalone
+  script approach).
 
 **Decision needed:** unblocked by current measurements; formal
 Stage 0 harness work can proceed in parallel with pitch conversations.

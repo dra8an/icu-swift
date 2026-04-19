@@ -57,6 +57,15 @@ Benchmark suite: `swift test -c release --filter "Benchmark"`. See `Docs/PERFORM
 | Moshier fallback | Chinese pre-1901 | ~437 |
 | Hindu lunisolar | Amanta, Purnimanta | ~3,900 |
 
+**⚠ 2026-04-19 PM update:** The numbers above were measured with
+`#expect` inside the hot loop (~1.5 µs overhead per call). After
+cleaning up the benchmark harness, actual per-date costs are
+**10–100× lower**: arithmetic calendars 9–96 ns/date, astronomical
+baked 20–43 ns, Chinese 42 ns. Hindu lunisolar unchanged at ~3.3 ms.
+See `Docs-Foundation/BENCHMARK_RESULTS.md` for the full
+clean-methodology results and vs-Foundation comparison (icu4swift is
+17–285× faster than Foundation's `Calendar` API across the board).
+
 ## Recent big work (session before handoff)
 
 ### Baked data refactor — 3 calendars done

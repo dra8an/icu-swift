@@ -6,7 +6,9 @@
 
 23 calendars implemented. 321 tests passing in ~28 seconds (release mode). All calendars validated against external authoritative sources; Chinese has 3 known-limitation failures in the 1906 cluster (Moshier-vs-HKO physical disagreement).
 
-**Performance:** all arithmetic and baked-table calendars at 2–4 µs/date. Only Hindu lunisolar remains in the slow tier at ~3,900 µs/date.
+**Performance (clean-methodology, 2026-04-19 PM):** 20 of 22 calendars under 300 ns/date. Arithmetic 9–96 ns, baked astronomical 20–43 ns, Chinese 42 ns. Only Hindu lunisolar remains in the slow tier at ~3.3 ms/date (unbaked Moshier). See `Docs-Foundation/BENCHMARK_RESULTS.md` for full table and Foundation comparison (icu4swift is 17–285× faster than Foundation's `Calendar` API).
+
+*Pre-2026-04-19 PM the published numbers were inflated by `#expect`-in-hot-loop overhead (~1.5 µs/call). Any remaining 2–4 µs or 3,900 µs references in this or the library-side Docs/ are pre-cleanup baselines.*
 
 See [`TestCoverageAndDocs.md`](TestCoverageAndDocs.md) for the master per-calendar index, [`PERFORMANCE.md`](PERFORMANCE.md) for benchmarks, and [`HANDOFF.md`](HANDOFF.md) for a full session-handoff summary.
 

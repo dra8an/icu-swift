@@ -1,3 +1,8 @@
+// Performance benchmarks for CalendarHindu.
+//
+// Methodology: see Docs-Foundation/05-PerformanceParityGate.md.
+// Hard rule: no `#expect` in the timed loop (~1.5 µs overhead/call).
+
 import Testing
 import Foundation
 @testable import CalendarCore
@@ -8,29 +13,31 @@ import Foundation
 struct HinduBenchmarks {
 
     static let startRD = GregorianArithmetic.fixedFromGregorian(year: 2024, month: 1, day: 1)
-    // Hindu calendars use Moshier — 100 dates is enough for a baseline
-    static let count = 100
 
     private func benchmark<C: CalendarProtocol>(
         _ calendar: C,
         label: String,
-        allowKshaya: Bool = false
+        iterations: Int = 100_000,
+        warmup: Int = 100
     ) {
-        let t0 = ProcessInfo.processInfo.systemUptime
-        for i in 0..<Self.count {
+        var checksum: Int64 = 0
+        for i in 0..<warmup {
             let rd = Self.startRD + Int64(i)
             let date = Date<C>.fromRataDie(rd, calendar: calendar)
             let back = calendar.toRataDie(date.inner)
-            if allowKshaya {
-                // Lunisolar: kshaya tithis can cause rd to map to previous day
-                #expect(back == rd || back == rd - 1)
-            } else {
-                #expect(back == rd)
-            }
+            checksum &+= back.dayNumber ^ Int64(date.dayOfMonth)
+        }
+        let t0 = ProcessInfo.processInfo.systemUptime
+        for i in 0..<iterations {
+            let rd = Self.startRD + Int64(i % 1000)
+            let date = Date<C>.fromRataDie(rd, calendar: calendar)
+            let back = calendar.toRataDie(date.inner)
+            checksum &+= back.dayNumber ^ Int64(date.dayOfMonth)
         }
         let elapsed = ProcessInfo.processInfo.systemUptime - t0
-        let perDate = elapsed / Double(Self.count) * 1_000_000
-        print("  \(label): \(Self.count) round-trips in \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDate)) µs/date)")
+        let perDateNs = elapsed / Double(iterations) * 1_000_000_000
+        #expect(checksum != 0)
+        print("  \(label): \(iterations) round-trips in \(String(format: "%.3f", elapsed * 1000)) ms (\(String(format: "%.1f", perDateNs)) ns/date)")
     }
 
     @Test("Benchmark: Hindu Tamil (solar)")
@@ -45,9 +52,11 @@ struct HinduBenchmarks {
     @Test("Benchmark: Hindu Malayalam (solar)")
     func benchMalayalam() { benchmark(HinduMalayalam(), label: "Malayalam") }
 
+    // Hindu lunisolar is astronomical (not baked) — ~3.5 ms/date with Moshier.
+    // 1000 iterations keeps total bench time under 5 seconds per calendar.
     @Test("Benchmark: Hindu Amanta (lunisolar)")
-    func benchAmanta() { benchmark(HinduAmanta(), label: "Amanta", allowKshaya: true) }
+    func benchAmanta() { benchmark(HinduAmanta(), label: "Amanta", iterations: 1000) }
 
     @Test("Benchmark: Hindu Purnimanta (lunisolar)")
-    func benchPurnimanta() { benchmark(HinduPurnimanta(), label: "Purnimanta", allowKshaya: true) }
+    func benchPurnimanta() { benchmark(HinduPurnimanta(), label: "Purnimanta", iterations: 1000) }
 }

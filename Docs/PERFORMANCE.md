@@ -30,7 +30,27 @@ back. Hindu uses 100 dates due to higher per-date cost.*
 
 Run with: `swift test -c release --filter "Benchmark"`
 
-| Calendar | µs/date | Category |
+**⚠ 2026-04-19 PM note:** The numbers in this table were measured
+with `#expect(back == rd)` inside the timed loop. Swift Testing's
+`#expect` macro costs ~1.5 µs per invocation even on success —
+which dominated measurements for fast calendars. After refactoring
+the bench harness (warm-up + timed region + checksum + one `#expect`
+outside), the true per-date costs are **10–100× lower**:
+
+- Simple calendars: 16–19 ns/date (not 2–4 µs)
+- Arithmetic: 9–96 ns/date (Hebrew highest; Coptic lowest)
+- Islamic tabular/civil/UQ: 20–43 ns/date
+- Chinese / Dangi (baked): 38–42 ns/date (not 2.2 µs)
+- Hindu solar (baked): 109–200 ns/date (not 2.4 µs)
+- Hindu lunisolar (Moshier, unbaked): ~3.3 ms/date (unchanged)
+- Chinese Moshier outside baked range: 483 ns/date (cache-amortized,
+  1000-day span) up to ~15 µs/date (30-day tight span)
+
+See `Docs-Foundation/BENCHMARK_RESULTS.md` for the clean-methodology
+full table and comparison against Foundation's `Calendar` API
+(icu4swift is 17–285× faster across the board).
+
+| Calendar | µs/date (pre-cleanup) | Category |
 |---|---:|---|
 | ISO | 1.9 | arithmetic |
 | Buddhist | 1.9 | arithmetic |
