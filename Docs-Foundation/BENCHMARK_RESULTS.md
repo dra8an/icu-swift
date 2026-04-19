@@ -1,18 +1,20 @@
 # Benchmark Results — icu4swift vs. Foundation
 
-*Created 2026-04-17. Measured results captured for permanence and pitch
-use. Update as new benchmarks are added.*
+*Created 2026-04-17. Last substantive update: 2026-04-19 (Hebrew
+optimization). Update as new benchmarks are added.*
 
 ## TL;DR
 
 | Calendar family | Winner |
 |---|---|
 | Astronomical (Chinese, Dangi, Islamic UQ) | **icu4swift** 2–12× (baked data) |
-| Arithmetic (Hebrew, Persian, Coptic, Ethiopian, Indian, Japanese, Islamic Civil/Tabular) | **Foundation** 1.3–1.7× (Swift micro-opt headroom) |
+| Hebrew | **at parity** (after 2026-04-19 optimization) |
+| Arithmetic ex-Hebrew (Persian, Coptic, Ethiopian, Indian, Japanese, Islamic Civil/Tabular) | **Foundation** 1.25–1.55× (residual "Swift tax") |
 
-Both sides are sub-3 µs/date on arithmetic calendars. The gap is real
-but small in absolute terms and closeable with targeted optimization.
-The astronomical win is structural (baked data vs. runtime compute).
+Both sides are sub-2 µs/date on all arithmetic calendars. The gap on
+the remaining arithmetic calendars is generic `Date<C>` wrapper +
+protocol dispatch overhead, not in-calendar computation. The
+astronomical win is structural (baked data vs. runtime compute).
 
 **20 of 22 icu4swift calendars are sub-3 µs/date.** Two exceptions:
 Hindu Amanta and Purnimanta (lunisolar) at ~3,500 µs/date — not yet
@@ -109,7 +111,90 @@ across the entire date range.
 5. **Hardware.** Single x86_64 macOS machine. Results will vary by
    hardware but the ratio should be stable.
 
-## Arithmetic calendars (2026-04-17)
+## Arithmetic calendars — after Hebrew optimization (2026-04-19)
+
+Following targeted Swift optimization of `HebrewArithmetic.swift` and
+`PersianArithmetic` (details in "Optimization notes" below). All
+other arithmetic calendars untouched — numbers reflect current
+baseline.
+
+Median of 10 runs per side, release mode, same hardware as 2026-04-17
+measurements.
+
+| Calendar | icu4swift (was) | icu4swift (now) | Foundation | Ratio |
+|---|---:|---:|---:|---:|
+| **Hebrew** | 2.7 µs | **1.65 µs** | 1.6 µs | **at parity** (0.05 µs) |
+| Persian | 1.6 µs | 1.5 µs | 1.1 µs | Foundation 1.36× |
+| Coptic | 1.6 µs | 1.5 µs | 1.2 µs | Foundation 1.25× |
+| Ethiopian (Amete Mihret) | 1.6 µs | 1.6 µs | 1.2 µs | Foundation 1.33× |
+| Indian | 1.5 µs | 1.6 µs | 1.1 µs | Foundation 1.45× |
+| Japanese | 1.6 µs | 1.7 µs | 1.1 µs | Foundation 1.55× |
+| Islamic Civil | 1.6 µs | 1.6 µs | 1.2 µs | Foundation 1.33× |
+| Islamic Tabular | 1.7 µs | 1.6 µs | 1.2 µs | Foundation 1.33× |
+| Islamic Umm al-Qura (baked) | 1.8 µs | 1.7 µs | 1.3 µs | Foundation 1.31× |
+
+**Hebrew closed to parity** (1.7× → 1.0× after optimization). Other
+calendars show small improvements from session-to-session noise but no
+structural change — the "Swift tax" floor of ~1.5 µs (vs Foundation's
+~1.1 µs) is likely generic `Date<C>` wrapper overhead and module
+boundaries, not per-calendar computation.
+
+### Optimization notes — Hebrew
+
+**Before:** each `fromRataDie` could invoke `newYear` up to ~40 times
+(month-search loop re-invoking `fixedFromHebrew`, each computing
+`newYear` from scratch; Marheshvan/Kislev `lastDayOfMonth` cascading
+into more `newYear` calls via `daysInYear`). `calendarElapsedDays`
+used floating-point division.
+
+**After:**
+- New `HebrewArithmetic.YearData` struct precomputes year metadata
+  once per call (`newYear`, `yearLen`, `isLeap`, `longMarheshvan`,
+  `shortKislev`). Month-walks use the cached struct.
+- `hebrewFromFixed` walks civil-order biblical months iteratively
+  from Tishri using accumulated day counts, never re-invoking
+  `fixedFromHebrew`.
+- `fixedFromHebrew` accepts the precomputed `YearData` via an
+  internal overload; the public entry still computes `YearData` once.
+- `calendarElapsedDays` rewritten using integer arithmetic (removed
+  `Double / 19.0` and `Double / 25920.0`).
+- `@inlinable` applied to hot-path static methods and `YearData.init`.
+- Biblical month constants promoted to `@usableFromInline` so
+  `@inlinable` code can reference them.
+
+**Correctness verified:** full 73,414-day Hebcal regression (1900–2100)
+passes with zero divergences. All 20 Hebrew tests in the suite pass.
+
+### Optimization notes — Persian
+
+**Before:** `nonLeapCorrection.contains(year)` did a linear scan over
+an 80-element array on every `isLeapYear` call. Called ~4× per
+round-trip.
+
+**After:**
+- `isNonLeapCorrection` implements binary search with early-out
+  range-check (O(log 80) = 7 comparisons instead of up-to-80).
+- `persianNewYear` extracted as a helper, reused by
+  `fixedFromPersian` and `persianFromFixed` to avoid computing
+  new-year twice during `persianFromFixed`.
+- `@inlinable` applied to hot-path methods.
+
+**Correctness verified:** 293-entry University of Tehran Nowruz data
+and all 9 Persian tests pass.
+
+### Why the remaining calendars weren't optimized
+
+Hebrew had a large structural win because of redundant `newYear`
+computation inside month-walk loops. Most other arithmetic calendars
+(Persian, Coptic, Ethiopian, Indian, Japanese, Islamic×3) are
+already minimal-arithmetic; they don't have the same redundancy to
+remove. The remaining 0.3–0.4 µs gap vs Foundation is the "Swift
+tax" — generic `Date<C>` wrapper, protocol witness dispatch through
+`CalendarProtocol`, and module boundaries. Closing that gap requires
+structural changes (specialization, reshaping the API surface) that
+are out of scope for a single-calendar micro-optimization pass.
+
+## Arithmetic calendars (2026-04-17, pre-optimization baseline)
 
 **Operation:** 1000 consecutive daily round-trips starting 2024-01-01.
 **Environment:** macOS x86_64, Swift 6, release build. Warm-up

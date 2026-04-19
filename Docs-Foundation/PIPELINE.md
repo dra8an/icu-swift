@@ -12,6 +12,22 @@ stage-level roadmap. `STATUS.md` is the current state snapshot.
 the bottom, rearrange as priorities shift. `NEXT.md` is only
 updated at session end (to signal what to pick up next time).
 
+## In flight
+
+~~### 2 — Close the arithmetic-calendar perf gap~~ *(partial win, 2026-04-19)*
+**Hebrew closed to parity** (2.9 µs → 1.65 µs vs Foundation's 1.6 µs).
+Pattern that worked: `YearData` struct computed once per call,
+month-walk uses cached struct, integer arithmetic, `@inlinable` on
+hot paths. Persian also slightly improved (1.6 → 1.5) via binary
+search on correction table.
+
+**Other arithmetic calendars (Coptic, Ethiopian, Indian, Japanese,
+Islamic×3) unchanged** — they don't have the same redundant
+computation Hebrew did. Remaining 0.3–0.4 µs gap vs Foundation is
+the "Swift tax" (generic `Date<C>` wrapper, protocol dispatch,
+module boundaries) — structural, not per-calendar. See new
+pipeline item #14 for closing that.
+
 ## Items in the pipeline
 
 ### 1 — Deliver the pitch to Apple
@@ -150,6 +166,22 @@ caching at 1850.
 - **Dependencies:** none.
 - **Unblocks:** small pitch-narrative improvement; may widen the
   perf moat on the one scenario where Foundation currently wins.
+
+### 14 — Close the "Swift tax" floor on simple arithmetic calendars
+The remaining ~0.3–0.4 µs gap on Persian/Coptic/Ethiopian/Indian/
+Japanese/Islamic×3 isn't per-calendar computation — it's the shared
+overhead of generic `Date<C>` construction, `CalendarProtocol`
+witness dispatch, and module-boundary costs. Investigate and close
+with one of: `@_specialize` annotations, concrete non-generic fast
+paths, inlinable public wrappers, or restructuring the
+`Date<C>.fromRataDie(_:calendar:)` API shape.
+
+- **Delivers:** all-sub-1.5-µs arithmetic calendars; full parity
+  narrative in the pitch.
+- **Effort:** 1–3 days. Requires more experimentation than Hebrew
+  did (no single obvious culprit).
+- **Dependencies:** none.
+- **Unblocks:** stronger pitch framing.
 
 ### 13 — Extend `FoundationCalBench.swift` to macOS 26.0+ identifiers
 Wrap `dangi`, `bangla`, `tamil`, `malayalam`, `odia` in

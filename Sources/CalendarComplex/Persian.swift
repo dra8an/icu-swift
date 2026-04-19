@@ -106,13 +106,16 @@ public struct PersianDateInner: Equatable, Comparable, Hashable, Sendable {
 
 // MARK: - PersianArithmetic
 
-enum PersianArithmetic {
+public enum PersianArithmetic {
 
     /// Persian epoch: March 19, 622 CE (Julian).
-    static let epoch: RataDie = JulianArithmetic.fixedFromJulian(year: 622, month: 3, day: 19)
+    @usableFromInline static let epoch: RataDie = JulianArithmetic.fixedFromJulian(year: 622, month: 3, day: 19)
+
+    @usableFromInline static let epochDayNumber: Int64 = epoch.dayNumber
 
     /// Years that violate the 33-year leap rule. The year following each is the actual leap year.
-    private static let nonLeapCorrection: [Int32] = [
+    /// Kept sorted for binary search.
+    @usableFromInline static let nonLeapCorrection: [Int32] = [
         1502, 1601, 1634, 1667, 1700, 1733, 1766, 1799, 1832, 1865, 1898, 1931, 1964, 1997, 2030, 2059,
         2063, 2096, 2129, 2158, 2162, 2191, 2195, 2224, 2228, 2257, 2261, 2290, 2294, 2323, 2327, 2356,
         2360, 2389, 2393, 2422, 2426, 2455, 2459, 2488, 2492, 2521, 2525, 2554, 2558, 2587, 2591, 2620,
@@ -120,23 +123,43 @@ enum PersianArithmetic {
         2851, 2855, 2880, 2884, 2888, 2913, 2917, 2921, 2946, 2950, 2954, 2979, 2983, 2987,
     ]
 
-    private static let minNonLeapCorrection: Int32 = 1502
+    @usableFromInline static let minNonLeapCorrection: Int32 = 1502
+    @usableFromInline static let maxNonLeapCorrection: Int32 = 2987
+
+    /// Binary search on the sorted `nonLeapCorrection` table.
+    /// Faster than `Array.contains` (O(log n) vs O(n)) and avoids the generic
+    /// specialization overhead of `Sequence.contains(_:)`.
+    @inlinable
+    static func isNonLeapCorrection(_ year: Int32) -> Bool {
+        if year < minNonLeapCorrection || year > maxNonLeapCorrection { return false }
+        var lo = 0
+        var hi = nonLeapCorrection.count &- 1
+        while lo <= hi {
+            let mid = (lo &+ hi) >> 1
+            let v = nonLeapCorrection[mid]
+            if v == year { return true }
+            if v < year { lo = mid &+ 1 } else { hi = mid &- 1 }
+        }
+        return false
+    }
 
     /// Whether a Persian year is a leap year (33-year rule with corrections).
-    static func isLeapYear(_ year: Int32) -> Bool {
-        if year >= minNonLeapCorrection && nonLeapCorrection.contains(year) {
+    @inlinable
+    public static func isLeapYear(_ year: Int32) -> Bool {
+        if isNonLeapCorrection(year) {
             return false
-        } else if year > minNonLeapCorrection && nonLeapCorrection.contains(year - 1) {
+        } else if year > minNonLeapCorrection && isNonLeapCorrection(year - 1) {
             return true
         } else {
-            var r = (25 * Int64(year) + 11) % 33
+            var r = (25 &* Int64(year) &+ 11) % 33
             if r < 0 { r += 33 }
             return r < 8
         }
     }
 
     /// Days in a Persian month.
-    static func daysInMonth(year: Int32, month: UInt8) -> UInt8 {
+    @inlinable
+    public static func daysInMonth(year: Int32, month: UInt8) -> UInt8 {
         if month <= 6 {
             return 31
         } else if month <= 11 {
@@ -147,43 +170,53 @@ enum PersianArithmetic {
     }
 
     /// Days before the given month starts (0-indexed).
-    static func daysBeforeMonth(_ month: UInt8) -> UInt16 {
+    @inlinable
+    public static func daysBeforeMonth(_ month: UInt8) -> UInt16 {
         if month <= 7 {
-            return 31 * UInt16(month - 1)
+            return 31 &* UInt16(month - 1)
         } else {
-            return 30 * UInt16(month - 1) + 6
+            return 30 &* UInt16(month - 1) &+ 6
         }
+    }
+
+    /// Compute the Persian new-year (Farvardin 1) RataDie for a given year.
+    /// Extracted so callers can reuse it within a single conversion.
+    @inlinable
+    static func persianNewYear(_ year: Int32) -> Int64 {
+        let y = Int64(year)
+        var ny = epochDayNumber &- 1 &+ 365 &* (y &- 1) &+ floorDiv(8 &* y &+ 21, 33)
+        if year > minNonLeapCorrection && isNonLeapCorrection(year - 1) {
+            ny &-= 1
+        }
+        return ny
     }
 
     /// Convert Persian (year, month, day) to RataDie using the fast 33-year rule.
-    static func fixedFromPersian(year: Int32, month: UInt8, day: UInt8) -> RataDie {
-        let y = Int64(year)
-        var newYear = epoch.dayNumber - 1
-            + 365 * (y - 1)
-            + floorDiv(8 * y + 21, 33)
-
-        if year > minNonLeapCorrection && nonLeapCorrection.contains(year - 1) {
-            newYear -= 1
-        }
-
+    @inlinable
+    public static func fixedFromPersian(year: Int32, month: UInt8, day: UInt8) -> RataDie {
+        let newYear = persianNewYear(year)
         let monthDays: Int64 = month <= 7
-            ? 31 * Int64(month - 1)
-            : 30 * Int64(month - 1) + 6
-
-        return RataDie(newYear - 1 + monthDays + Int64(day))
+            ? 31 &* Int64(month &- 1)
+            : 30 &* Int64(month &- 1) &+ 6
+        return RataDie(newYear &- 1 &+ monthDays &+ Int64(day))
     }
 
     /// Convert RataDie to Persian (year, month, day).
-    static func persianFromFixed(_ date: RataDie) -> (year: Int32, month: UInt8, day: UInt8) {
+    @inlinable
+    public static func persianFromFixed(_ date: RataDie) -> (year: Int32, month: UInt8, day: UInt8) {
         var year = yearFromFixed(date)
 
-        var dayOfYear = 1 + (date.dayNumber - fixedFromPersian(year: year, month: 1, day: 1).dayNumber)
+        // Compute the year's Farvardin 1 once and reuse.
+        var ny = persianNewYear(year)
+        var dayOfYear = 1 &+ (date.dayNumber &- ny)
 
-        // Handle correction table edge case
+        // Handle correction table edge case: 366th day of a "correction" year
+        // actually belongs to the next year's day 1.
         if dayOfYear == 366
             && year >= minNonLeapCorrection
-            && nonLeapCorrection.contains(year) {
-            year += 1
+            && isNonLeapCorrection(year) {
+            year &+= 1
+            ny = persianNewYear(year)
             dayOfYear = 1
         }
 
@@ -194,26 +227,34 @@ enum PersianArithmetic {
             month = UInt8(ceilDiv(dayOfYear - 6, 30))
         }
 
-        let day = UInt8(date.dayNumber - fixedFromPersian(year: year, month: month, day: 1).dayNumber + 1)
+        // Day-of-month: civil day − start-of-month.
+        // start-of-month = ny + monthDaysBefore(month).
+        let monthDaysBefore: Int64 = month <= 7
+            ? 31 &* Int64(month &- 1)
+            : 30 &* Int64(month &- 1) &+ 6
+        let day = UInt8(date.dayNumber &- ny &- monthDaysBefore &+ 1)
 
         return (year, month, day)
     }
 
-    private static func yearFromFixed(_ date: RataDie) -> Int32 {
-        let daysSinceEpoch = date.dayNumber - epoch.dayNumber + 1
-        let year = 1 + floorDiv(33 * daysSinceEpoch + 3, 12053)
+    @inlinable
+    static func yearFromFixed(_ date: RataDie) -> Int32 {
+        let daysSinceEpoch = date.dayNumber &- epochDayNumber &+ 1
+        let year = 1 &+ floorDiv(33 &* daysSinceEpoch &+ 3, 12053)
         return Int32(year)
     }
 
-    private static func floorDiv(_ a: Int64, _ b: Int64) -> Int64 {
+    @inlinable
+    static func floorDiv(_ a: Int64, _ b: Int64) -> Int64 {
         if (a >= 0) == (b > 0) {
             return a / b
         } else {
-            return (a - b + 1) / b
+            return (a &- b &+ 1) / b
         }
     }
 
-    private static func ceilDiv(_ a: Int64, _ b: Int64) -> Int64 {
-        (a + b - 1) / b
+    @inlinable
+    static func ceilDiv(_ a: Int64, _ b: Int64) -> Int64 {
+        (a &+ b &- 1) / b
     }
 }
