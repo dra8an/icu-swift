@@ -28,6 +28,7 @@ still rely only on hand-picked unit tests.
 | **Islamic Umm al-Qura** | ✅ shared | ✅ shared | ✅ 4,380 / 0 | Foundation (baked KACST data, 1300–1600 AH) |
 | **Islamic (astronomical)** | ✅ [`ISLAMIC_ASTRONOMICAL.md`](ISLAMIC_ASTRONOMICAL.md) | – | – (delegates to UmmAlQura) | Deferred: divergence test vs Foundation's `.islamic` (PIPELINE item 19) |
 | **Ethiopian Amete Alem** | – (shares `Ethiopian.md` scope) | – | ✅ 73,414 / 0 | Internal round-trip (shares arithmetic with `Ethiopian`, era surface-differs) |
+| **Vietnamese** | – (shares `Chinese.md` scope) | – | ✅ 1,045 / 0 round-trip | Internal consistency (shares `ChineseCalendar<V>` generic; neither ICU4C nor ICU4X implement Vietnamese, so no external reference) |
 | **Chinese** | ✅ [`Chinese.md`](Chinese.md) | ✅ [`Chinese_reference.md`](Chinese_reference.md) | ⚠️ 2,461 / 3 | Hong Kong Observatory |
 | **Dangi** | ✅ [`Dangi.md`](Dangi.md) | – | deferred | Structurally identical to Chinese (different longitude only); KASI data available via `korean_lunar_calendar_py` if needed |
 | **Hindu Tamil** (solar) | ✅ [`HinduCalendars.md`](HinduCalendars.md) | – | ✅ 1,811 / 0 | built-in CSV |

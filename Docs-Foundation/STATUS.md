@@ -68,7 +68,7 @@ flipped from ICU to Swift.
 | islamicUmmAlQura | ✓ | — | — | — |
 | chinese | ✓ | — | — | — |
 | dangi | ✓ | — | — | — |
-| vietnamese | — (missing) | — | — | — |
+| vietnamese | ✓ (`Vietnamese = ChineseCalendar<Vietnam>`) | — | — | — |
 | bangla | ✓ (Hindu solar Bengali) | — | — | — |
 | tamil | ✓ (Hindu solar Tamil) | — | — | — |
 | odia | ✓ (Hindu solar Odia) | — | — | — |

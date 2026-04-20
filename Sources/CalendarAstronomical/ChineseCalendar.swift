@@ -33,6 +33,43 @@ public enum China: EastAsianVariant {
     public static let epoch = GregorianArithmetic.fixedFromGregorian(year: -2636, month: 2, day: 15)
 }
 
+/// Vietnamese calendar variant (Hanoi, UTC+7).
+///
+/// The Vietnamese lunar calendar follows the same Chinese-family tradition
+/// (60-year cycle, same epoch conventions) but calculates new-moon
+/// boundaries at Hanoi's local time. In practice, the output differs from
+/// `Chinese` only on rare days where a new moon falls within the ~1-hour
+/// UTC offset window between Hanoi (UTC+7) and Beijing (UTC+8).
+///
+/// Neither upstream ICU4C nor ICU4X implement a distinct Vietnamese
+/// calendar; Foundation exposes `.vietnamese` as a `Calendar.Identifier`
+/// but its `_CalendarICU` implementation has a TODO comment noting that
+/// the handling is "copied from `.chinese` and needs to be revisited."
+/// icu4swift ships Vietnamese as its own variant so the identifier is
+/// distinct from `.chinese` and future refinement (e.g. a Vietnamese-
+/// calibrated baked data table) is localised here.
+///
+/// **Baked-data caveat.** `ChineseYearTable` is calibrated for Beijing.
+/// When dates fall within its range (1901–2099), the Vietnamese variant
+/// uses the Beijing-calibrated table as an approximation — the same
+/// tradeoff Dangi already makes. Outside the range, falls through to
+/// Moshier ephemeris at UTC+7 via `ChineseYearCache` (keyed on variant,
+/// so Vietnamese and Dangi do not share cache slots with Chinese).
+public enum Vietnam: EastAsianVariant {
+    public static let calendarIdentifier = "vietnamese"
+    public static func utcOffset(rd: RataDie) -> Double {
+        // French Indochina used UTC+8 or Paris time before WWII, then
+        // Japanese occupation used UTC+9, then various offsets until
+        // stabilising on UTC+7 from 1967 for Vietnam proper. For
+        // simplicity and the lack of any authoritative reference ICU
+        // implementation, we use UTC+7 (current Hanoi time) throughout.
+        return 7.0 / 24.0
+    }
+    // Same epoch as Chinese — the 60-year cyclic numbering is shared
+    // across the Chinese-family calendars that use it.
+    public static let epoch = GregorianArithmetic.fixedFromGregorian(year: -2636, month: 2, day: 15)
+}
+
 /// Korean (Dangi) calendar variant (Seoul, UTC+9).
 public enum Korea: EastAsianVariant {
     public static let calendarIdentifier = "dangi"
@@ -483,3 +520,6 @@ public typealias Chinese = ChineseCalendar<China>
 
 /// The Korean traditional (Dangi) calendar.
 public typealias Dangi = ChineseCalendar<Korea>
+
+/// The Vietnamese traditional calendar.
+public typealias Vietnamese = ChineseCalendar<Vietnam>

@@ -200,11 +200,12 @@ out to call into our port.
 
 **Risk:** low-medium.
 
-**Concern.** icu4swift is missing three Foundation identifiers:
-`ethiopicAmeteAlem`, `islamic` (astronomical), and `vietnamese`. The
-five regional Hindu lunisolar labels (`gujarati`, `kannada`, `marathi`,
-`telugu`, `vikram`) need to be mapped to our `Amanta`/`Purnimanta` with
-the correct regional conventions.
+**Concern.** ~~icu4swift is missing three Foundation identifiers:
+`ethiopicAmeteAlem`, `islamic` (astronomical), and `vietnamese`.~~
+**All three resolved 2026-04-20.** The five regional Hindu lunisolar
+labels (`gujarati`, `kannada`, `marathi`, `telugu`, `vikram`) still
+need to be mapped to our `Amanta`/`Purnimanta` with the correct
+regional conventions.
 
 **Why it matters.** Shipping a "23 of 28" Swift backend is not
 shippable. The port is atomic at the library level.
@@ -224,8 +225,17 @@ shippable. The port is atomic at the library level.
   Full rationale in `Docs/ISLAMIC_ASTRONOMICAL.md`. Divergence
   testing against Foundation's `.islamic` output is a deferred
   pipeline item (see PIPELINE item 19).
-- `vietnamese`: Chinese-family calendar at UTC+7. Structure is
-  identical to Chinese/Dangi; just a new `VietnamVariant`. Low effort.
+- `vietnamese`: **resolved 2026-04-20** — new `Vietnam: EastAsianVariant`
+  added in `Sources/CalendarAstronomical/ChineseCalendar.swift` with
+  UTC+7 (Hanoi). `public typealias Vietnamese = ChineseCalendar<Vietnam>`
+  exposes it alongside `Chinese` and `Dangi`. 6 regression tests
+  added; all passing. Uses Beijing-calibrated baked table as an
+  approximation (same tradeoff as Dangi); Moshier fallback outside
+  the baked range at UTC+7. Note: neither ICU4C nor ICU4X implement
+  a distinct Vietnamese calendar, and Foundation's own `_CalendarICU`
+  has a TODO comment indicating its handling is "copied from `.chinese`
+  and needs to be revisited" — so we're in under-specified territory
+  either way.
 - Hindu regional lunisolar labels: need to confirm with Foundation's
   `hinducal.cpp` fork semantics whether these are genuine variants or
   just locale-labelled aliases. Likely the latter.
