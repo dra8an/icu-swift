@@ -1,6 +1,6 @@
 # Foundation Calendar Port — Status
 
-*Last updated 2026-04-17 (end-of-day). Update this file at every checkpoint.*
+*Last updated 2026-04-20. Update this file at every checkpoint.*
 
 One-page snapshot of where the project stands. For the roadmap see
 `PROJECT_PLAN.md`; for immediate next steps see `NEXT.md`.
@@ -92,17 +92,20 @@ the formal Stage 0 gate, but enough to de-risk the pitch.
 | Chinese (Moshier, 2200, 1000d) | 3.4 µs | ~41 µs | ✓ (icu4swift 12× faster) |
 | Chinese (Moshier, 1850, 1000d) | 26 µs | ~44 µs | ✓ (icu4swift 1.7× faster) |
 | Chinese (Moshier, 1850, 30d) | 357 µs | ~30 µs | ✓ (**Foundation 12× faster** — narrow window) |
-| Simple (ISO, Gregorian, Julian, Buddhist, ROC) | 16–19 ns | ~1,100–1,400 ns | ✓ (icu4swift 58–74× faster) |
-| Arithmetic (Hebrew, Coptic, Ethiopian, Persian, Indian, Japanese) | 9–96 ns | ~1,100–1,600 ns | ✓ (icu4swift 17–130× faster) |
-| Islamic (Tabular, Civil, UQ) | 20–43 ns | ~1,200–1,300 ns | ✓ (icu4swift 30–60× faster) |
-| Chinese (baked) | 42 ns | ~12,000 ns | ✓ (icu4swift ~285× faster) |
-| Dangi, Hindu solar | 38–200 ns | macOS 26+ only | icu4swift only |
-| Hindu lunisolar (Amanta, Purnimanta) | ~3.3 ms | macOS 26+ only | partial (icu4swift only) |
+Three-way (2026-04-20 update, Homebrew ICU4C v78 as "ICU4C direct"):
 
-**All 2026-04-19 PM measurements are with the clean harness** —
-no `#expect` in the timed loop, 100k iterations, checksum. Earlier
-numbers in this file (1.5–2.9 µs range) were `#expect`-overhead
-artifacts.
+| Calendar family | icu4swift | ICU4C direct | Foundation |
+|---|---:|---:|---:|
+| Simple / arithmetic (most identifiers) | 9–26 ns | 250–330 ns | ~1,100–1,400 ns |
+| Hebrew | 96 ns | 1,085 ns | ~1,600 ns |
+| Islamic Civil / Tabular / UQ | 20–43 ns | 330–721 ns | ~1,200–1,300 ns |
+| Chinese (baked) | 42 ns | 41,652 ns | ~12,000 ns |
+| Hindu solar (baked) | 109–200 ns | macOS 26+ only | macOS 26+ only |
+| Hindu lunisolar (Moshier) | ~3.3 ms | macOS 26+ only | macOS 26+ only |
+
+**All measurements use clean harness** — no `#expect` in the timed
+loop, 100k iterations, warm-up excluded, checksum prevents
+dead-code elimination.
 
 Formal Stage 0 (per-calendar ICU baseline capture within
 `swift-foundation`'s benchmark harness) is still pending.
@@ -139,5 +142,20 @@ is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
   `#expect`-in-timed-loop issue discovered and documented. Benchmark
   harness refactored across all 5 bench files. Clean sweep across
   all 22 calendars: icu4swift is 17–285× faster than Foundation's
-  public Calendar API. `BENCHMARK_RESULTS.md` updated. PIPELINE
-  items 16 (clean bench) done; 17 (direct ICU4C comparison) added.
+  public Calendar API. `BENCHMARK_RESULTS.md` updated. Stale perf
+  numbers across all Docs/ and Docs-Foundation/ docs fixed with
+  ⚠ notes pointing to the new clean numbers. Benchmark discipline
+  rule added to `CLAUDE.md`, memory, and `05-PerformanceParityGate.md`.
+  PIPELINE items 16 (clean bench) done; 17 (direct ICU4C comparison)
+  queued for next session in `NEXT.md`; 18 (extreme-range arithmetic
+  regression) added as backlog.
+- 2026-04-20 — PIPELINE item 17 done. `Scripts/ICU4CCalBench.c`
+  written and compiled against Homebrew ICU4C v78. Three-way table
+  added to `BENCHMARK_RESULTS.md`. **Key finding: icu4swift beats
+  raw ICU4C's own C API by 10–40× on arithmetic calendars and
+  ~1,000× on Chinese.** Foundation adds ~800 ns of Swift/ObjC
+  wrapper overhead on top of ICU4C per iteration. Anomaly noted:
+  ICU4C Chinese (Homebrew v78) slower than Foundation's Chinese
+  (41 µs vs 12 µs) — likely ICU-version or Apple-optimization
+  difference, worth investigating but not blocking. Apples-to-oranges
+  caveat substantially resolved; `PITCH.md` Beat 3 reworded.

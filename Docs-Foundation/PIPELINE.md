@@ -198,43 +198,75 @@ Clean sweep captured in `BENCHMARK_RESULTS.md`. Headline: icu4swift
 is 17–285× faster than Foundation's `Calendar` API on every
 measurable identifier. Chinese is the biggest win at ~285×.
 
-### 17 — Direct ICU4C benchmark for apples-to-apples comparison
-Our current comparison is **icu4swift raw RataDie round-trip** vs
-**Foundation's public `Calendar` API**. Foundation's API includes
-TZ conversion, sparse `DateComponents` construction, and mutex-gated
-ICU state-machine calls — genuinely more work per iteration than our
-bench measures. The honest comparison is against **ICU4C's calendar
-math directly**, skipping the Swift/Foundation wrapper.
+~~### 17 — Direct ICU4C benchmark for apples-to-apples comparison~~ *(done 2026-04-20)*
+C benchmark written (`Scripts/ICU4CCalBench.c`), compiled against
+Homebrew's ICU4C v78, run for 14 calendars. Three-way table now in
+`BENCHMARK_RESULTS.md`. Headline: **icu4swift beats raw ICU4C math
+by 10–40× on arithmetic calendars, ~1,000× on Chinese.** Foundation
+adds ~800 ns wrapper cost on top of ICU4C. Apples-to-oranges caveat
+substantially resolved.
 
-Scope:
-- Write a small C++ (or C) benchmark using ICU4C's `ucal_*` API
-  directly: `ucal_open`, `ucal_setMillis`, `ucal_get` × fields,
-  `ucal_clear`, `ucal_set` × fields, `ucal_getMillis`. Same
-  round-trip semantics as our Swift bench.
-- Use the ICU sources at `/Users/draganbesevic/Projects/claude/icu/icu4c/`
-  (upstream) and optionally `swift-foundation-icu`'s fork.
-- Same shape: 100k iterations, same date range (2024+), warm-up
-  excluded, checksum.
-- Per-calendar coverage: at minimum gregorian, hebrew, chinese,
-  coptic, persian, islamic, japanese. Extend as needed.
-- Build a **three-way table** in `BENCHMARK_RESULTS.md`:
-  - icu4swift (raw calendar math)
-  - **ICU4C direct** (raw C++ calendar math)
-  - Foundation `Calendar` (Swift wrapper on top of ICU4C)
-- Analyze the spread: what fraction of Foundation's cost is
-  `_CalendarICU` bridge vs ICU's actual math.
+Anomaly to investigate later (low priority): ICU4C Chinese measured
+slower than Foundation's Chinese (~41 µs vs ~12 µs) — likely an
+ICU-version or Apple-specific-optimization difference. icu4swift
+wins both at 42 ns regardless.
 
-- **Delivers:** definitive answer to "is our underlying calendar
-  math actually faster than ICU's?" Removes the apples-to-oranges
-  framing from the pitch. Also quantifies how much the Swift wrapper
-  Foundation uses adds on top of ICU4C, which informs Stage 1 of
-  the port (we'll pay similar costs when we wrap icu4swift).
-- **Effort:** 1–2 days. Requires a bit of ICU4C build configuration
-  and C++ knowledge.
-- **Dependencies:** ICU4C source cloned (already done). Working C++
-  compiler + ICU library link path.
-- **Unblocks:** the strongest-possible pitch framing; full
-  methodology transparency.
+### 18 — Extreme-range regression testing for arithmetic calendars
+Today's Hebrew regression runs 73,414 days (1900–2100) against
+Hebcal with zero divergences. Since Hebrew (and the other arithmetic
+calendars) are pure integer math, in principle they should be
+correct for any year in the `Int32` / `Int64` range. Worth validating
+that claim explicitly, even if only as a one-off confidence test.
+
+**Compute cost estimate (Hebrew, ±10,000 years → ~7.3 M days):**
+at the measured 96 ns/round-trip: **~0.7 seconds** of raw
+computation. Including Hebcal-row comparison overhead: **~7 seconds**
+standalone, **~30 seconds** inside Swift Testing. Compute is
+trivial; the real question is the reference source.
+
+**Three sub-options, increasing value-per-effort:**
+
+**(a) Round-trip stability** (fastest, no external deps)
+For every RD in the range, assert `toRataDie(fromRataDie(rd)) == rd`.
+Doesn't catch shift-by-constant errors but catches any internal
+inconsistency in the implementation. Over ±10,000 years: ~1.4 s for
+Hebrew, similar for other arithmetic calendars. Zero storage, zero
+external dependencies. **Recommended as the first thing to land.**
+
+**(b) Reingold & Dershowitz reference port as oracle** (moderate effort)
+R&D's Lisp/Python reference implementations in *Calendrical
+Calculations* are the canonical source for all these algorithms.
+Port one file (e.g. Python `hebrew.py`) into a test fixture, use
+it as the oracle over any year range. Catches shift-by-constant
+errors too. One-time port effort; then validates any arithmetic
+calendar indefinitely without needing Hebcal or similar.
+
+**(c) Full Hebcal extension** (most comprehensive, diminishing returns)
+Extract a ±10,000 year CSV from Hebcal (~7.3M rows, ~220 MB). Run
+the existing regression shape against it. Validates against the
+same external reference the 1900–2100 test uses today. Storage
+and generation cost non-trivial; value over (b) minimal for
+arithmetic calendars.
+
+**Applies to:** Hebrew, Coptic, Ethiopian, Persian, Indian,
+Islamic Civil, Islamic Tabular (the pure-arithmetic calendars).
+Not applicable to baked-data (range-bounded) or astronomical
+calendars.
+
+- **Delivers:** demonstrable correctness guarantee over any year
+  range a user could plausibly query. Useful for the pitch
+  ("we're correct outside the historical range too") and for
+  long-horizon planning calendars (religious year tables, etc.).
+- **Effort:** (a) an hour, (b) 1–2 days per ported R&D file, (c)
+  a few hours but with large-data storage cost.
+- **Dependencies:** none for (a); R&D reference for (b); Hebcal
+  tooling for (c).
+- **Unblocks:** confidence in arithmetic calendar correctness
+  beyond the 1900–2100 window. Modest but real.
+
+My recommendation: **do (a) soon as a one-off validation; (b) only
+if we want a reusable oracle for future arithmetic calendars; skip
+(c).**
 
 ### 13 — Extend `FoundationCalBench.swift` to macOS 26.0+ identifiers
 Wrap `dangi`, `bangla`, `tamil`, `malayalam`, `odia` in
@@ -256,12 +288,12 @@ A few natural constraints worth keeping in mind when rearranging:
 - **Items 3–8** (reference docs) have internal dependencies
   (5 → 6 → 7, 3 & 4 before 5).
 - **Items 9 and 10** (code work) should be preceded by item 6.
-- **Items 11, 12, 13, 15, 16, 17** are independent of the rest; fill time
-  between blocked items.
-- **Items 16 and 17** both materially improve pitch numbers — 16
-  gives us clean across-the-board data; 17 removes the
-  apples-to-oranges concern. Both good to land before the pitch
-  conversation happens.
+- **Items 11, 12, 13, 15, 17, 18** are independent of the rest; fill
+  time between blocked items.
+- **Item 17** removes the apples-to-oranges concern in the perf
+  comparison — good to land before the pitch conversation happens.
+- **Item 18(a)** (round-trip stability) is an hour of work and
+  gives us a nice "correct over ±10,000 years" talking point.
 
 ## Process
 

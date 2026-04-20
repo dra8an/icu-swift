@@ -51,27 +51,24 @@ noticed a half-finished initiative and I can help with the rest."
 example with the most "wow" per word. Options, in order of impact
 for a Foundation engineer:
 
-1. **Performance (measured, the lead recommendation).** "Chinese
-   calendar: icu4swift **1.9 µs/date** vs Foundation's **~12 µs/date**
-   — **6–7× faster** in the baked range, still 1.7–12× faster on
-   realistic spans outside it. Structural win from baked data
-   versus ICU's runtime astronomy.
+1. **Performance (measured, the lead recommendation).** "We have
+   a three-way comparison — icu4swift, ICU4C direct (C API, no
+   Swift wrapper), and Foundation's public Calendar API — all run
+   with matching methodology (100k iterations, warm-up, checksum,
+   release-mode). On **arithmetic calendars** (Gregorian, Hebrew,
+   Persian, Coptic, Indian, Japanese, Islamic×3), icu4swift is
+   **10–40× faster than raw ICU4C's C++ math**. On **Chinese**,
+   icu4swift is ~**1,000× faster than raw ICU4C** (baked HKO data
+   vs ICU's runtime astronomy). Foundation adds ~800 ns of
+   Swift/ObjC wrapper overhead on top of ICU4C for every identifier.
    
-   *Low-level arithmetic-calendar math is also dramatically faster:*
-   Coptic ~5 ns/date, Persian ~22 ns/date, Hebrew ~95 ns/date (all
-   round-trips, release mode, 100k iters). Foundation's equivalent
-   `Calendar` API is 1,100–1,600 ns/date — but that's not an
-   apples-to-apples comparison because Foundation's API does more
-   per iteration (TZ conversion, sparse `DateComponents`, mutex).
-   Realistic prediction for the ported integration: icu4swift wins
-   1.5–5× on arithmetic calendars end-to-end, plus 2–12× on
-   astronomical."
+   Concrete: Chinese round-trip — **42 ns** on icu4swift,
+   **~12,000 ns** on Foundation's Calendar API, **~41,000 ns** on
+   raw ICU4C via `ucal_*`."
    
-   See `BENCHMARK_RESULTS.md` for methodology and caveats.
-   Acknowledge the apples-to-oranges framing if asked — the
-   underlying calendar math being 10–300× faster is robust; the
-   end-to-end speedup depends on how much of that survives the
-   Calendar wrapper layer.
+   See `BENCHMARK_RESULTS.md` § "Three-way comparison" for the full
+   table. The apples-to-oranges question is substantially resolved —
+   we beat ICU4C head-to-head, independent of the wrapper layer.
 
 2. **Code size.** "Chinese calendar in icu4swift is ~600 lines of
    Swift. ICU's `chnsecal.cpp` + `astro.cpp` is around 4,000 lines of

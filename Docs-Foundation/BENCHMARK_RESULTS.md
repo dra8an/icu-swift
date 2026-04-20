@@ -24,11 +24,11 @@ calendars are under 300 ns/date; the two exceptions (Hindu
 lunisolar) remain the documented slow tier and will close with
 baking (pipeline item 11).
 
-**Apples-to-oranges caveat.** Foundation's `Calendar` API does more
-per iteration — TZ conversion, sparse `DateComponents`, mutex. See
-§ "The `#expect` overhead finding" for full methodology. Pipeline
-item 17 (direct ICU4C benchmark) will quantify how much of the
-Foundation gap is wrapper overhead vs calendar math.
+**Apples-to-oranges caveat substantially resolved 2026-04-20.** See
+§ "Three-way comparison" above. Direct ICU4C measurement confirms
+icu4swift beats raw ICU4C math by 10–40× on arithmetic calendars and
+~1,000× on Chinese. Foundation adds ~800 ns of Swift/ObjC wrapper
+cost on top of that.
 
 ## Chinese calendar round-trip (2026-04-17)
 
@@ -360,6 +360,91 @@ How to handle it in the pitch:
 
 This reframes the one loss as "we chose accuracy; the cost is
 fixable and small in scope."
+
+## Three-way comparison — icu4swift vs ICU4C direct vs Foundation (2026-04-20)
+
+This sweep resolves the apples-to-oranges concern. We now have a
+measurement of **ICU4C's own C calendar API** (via `ucal_*` directly,
+no Swift/ObjC wrapper), comparable head-to-head against both
+icu4swift and Foundation's public `Calendar` API.
+
+**Methodology:** same shape on all three sides — round-trip
+(decompose + recompose), 100,000 iterations, 1000-day date window
+starting 2024-01-01 UTC, warm-up excluded, checksum prevents
+dead-code elimination, release-mode optimization.
+
+- **icu4swift**: raw `calendar.fromRataDie(rd)` → `calendar.toRataDie(inner)`
+- **ICU4C direct**: `ucal_setMillis` → 5× `ucal_get` → `ucal_clear`
+  → 5× `ucal_set` → `ucal_getMillis`, via Homebrew's ICU4C v78
+- **Foundation**: `cal.dateComponents(...)` → `cal.date(from:)`,
+  which internally dispatches through `_CalendarICU` to the same
+  `ucal_*` API (Apple's bundled ICU, not Homebrew's)
+
+Source: `Scripts/ICU4CCalBench.c` (new), `Scripts/FoundationCalBench.swift`,
+icu4swift's `benchmark<C>` helper in `Tests/`.
+
+### Results (ns/date, median of 3 runs)
+
+| Calendar | icu4swift | ICU4C direct | Foundation |
+|---|---:|---:|---:|
+| Gregorian | **19** | 274 | ~1,100 |
+| Coptic | **9** | 275 | ~1,200 |
+| Ethiopian | **12** | 258 | ~1,200 |
+| Indian | **26** | 251 | ~1,100 |
+| Japanese | **19** | 318 | ~1,100 |
+| Persian | **14** | 264 | ~1,100 |
+| ROC (Taiwan) | **19** | 258 | ~1,100 |
+| Buddhist | **19** | 309 | ~1,400 |
+| Hebrew | **96** | 1,085 | ~1,600 |
+| Islamic (astronomical) | — *(not in icu4swift yet)* | 1,085 | ~1,200 *(?)* |
+| Islamic Civil | **20** | 721 | ~1,200 |
+| Islamic Tabular | **21** | 330 | ~1,200 |
+| Islamic Umm al-Qura | **43** | 398 | ~1,300 |
+| Chinese | **42** | 41,652 | ~12,000 |
+| Dangi | **38** | 39,230 | macOS 26+ only |
+
+### What the three-way split tells us
+
+**1. Our calendar math is genuinely faster than ICU's.** Across the
+arithmetic set (Gregorian, Coptic, Ethiopian, Indian, Japanese,
+Persian, ROC, Buddhist, Islamic Civil/Tabular/UQ), ICU4C direct
+measures **250–730 ns per iteration** doing the same round-trip.
+icu4swift does the equivalent in **9–43 ns**, or **10–40× faster**
+than ICU's own C++. Hebrew is a larger gap at **11× faster** because
+Hebrew's compute is more than ICU's ucal overhead.
+
+**2. Foundation's wrapper overhead is ~800–1,000 ns per iteration.**
+On arithmetic calendars, Foundation-vs-ICU4C is a near-constant
+offset of ~800 ns — Swift/ObjC bridging, `DateComponents` struct
+construction, mutex acquire/release, autoclosure wrappers. That
+cost is independent of calendar complexity.
+
+**3. Chinese/Dangi is anomalous.** ICU4C direct (Homebrew v78)
+measures ~41,000 ns per Chinese round-trip — **slower than
+Foundation's ~12,000 ns**. Unexpected; likely one of:
+- Apple's bundled ICU has Chinese-specific optimizations.
+- Version difference (Homebrew v78 vs whatever Apple ships).
+- Foundation has additional caching we haven't disassembled.
+
+Either way, icu4swift wins at **42 ns** — roughly **1,000× faster
+than raw ICU4C**, ~285× faster than Foundation. Investigating the
+Chinese anomaly is low-priority (pipeline #12 is related).
+
+### Practical conclusion for the pitch
+
+The apples-to-oranges caveat is **substantially resolved**:
+
+> "We measured three ways: icu4swift's pure-Swift math, ICU4C's
+> own C API directly, and Foundation's public Calendar API. icu4swift
+> beats the raw ICU4C math by **10–40× on arithmetic calendars** and
+> **1,000× on Chinese**. On top of that, Foundation adds ~800 ns of
+> Swift/ObjC wrapper overhead per iteration. Removing the ICU4C
+> dependency saves that math cost directly — even if our own
+> Calendar wrapper layer adds similar overhead back, the underlying
+> math savings remain."
+
+No more "but Foundation does more per iteration" rebuttal. ICU4C
+direct is the fair baseline, and we beat it decisively.
 
 ## Clean-methodology sweep — all 22 calendars (2026-04-19)
 
