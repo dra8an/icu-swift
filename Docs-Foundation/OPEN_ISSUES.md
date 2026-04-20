@@ -210,7 +210,13 @@ the correct regional conventions.
 shippable. The port is atomic at the library level.
 
 **What would resolve it.**
-- `ethiopicAmeteAlem`: epoch offset from existing Ethiopian. Trivial.
+- `ethiopicAmeteAlem`: **resolved 2026-04-20** — `EthiopianAmeteAlem`
+  struct added in `Sources/CalendarComplex/EthiopianAmeteAlem.swift`.
+  Shares `CopticArithmetic` and `EthiopianDateInner` with `Ethiopian`;
+  differs only in reporting the `mundi` era + "ethiopic-amete-alem"
+  identifier. Year N Amete Alem = Year (N − 5500) Amete Mihret.
+  8 regression tests added; all passing (including 73,414-day
+  round-trip over 1900–2100).
 - `islamic` (astronomical): **resolved 2026-04-20 via alias** —
   `IslamicAstronomical` now ships as a delegating wrapper over
   `IslamicUmmAlQura`, matching ICU4X's direction (their
