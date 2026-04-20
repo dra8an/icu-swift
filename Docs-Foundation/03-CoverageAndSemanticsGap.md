@@ -64,28 +64,85 @@ What icu4swift already provides (from `CalendarProtocol` and
 - `Date.added(.days, N)` and related Temporal-spec arithmetic
 - `DateStatus` / `alternativeDate` for non-bijective days
 
-What Foundation's public `Calendar` API requires on top of that
-(the Stage 1 growth list):
+### What the actual gap is
 
-| Foundation API | Status in icu4swift |
+Foundation's public `Calendar` API has ~41 public methods plus
+`Calendar.RecurrenceRule`. **icu4swift does not need to implement
+41 things.** `_CalendarProtocol` — the backend contract that
+`swift-foundation`'s 41 public methods route through — has only
+**10 primitive methods** and a small set of stored properties.
+Every other Foundation method (including `nextDate`,
+`enumerateDates`, the sequence APIs, and `RecurrenceRule`) is
+implemented generically in `swift-foundation` on top of that
+protocol and comes along for free.
+
+The Stage 1 gap, in three tiers:
+
+**Tier 1 — The 10 `_CalendarProtocol` primitives icu4swift must
+provide:**
+
+| Method | Status in icu4swift |
 |---|---|
-| `timeZone`, `firstWeekday`, `minimumDaysInFirstWeek`, `locale`, `gregorianStartDate` as stored state | not present |
-| `(Date, TimeZone) ↔ (RataDie, secondsInDay)` adapter | not present |
-| Sparse `DateComponents` round-trip | not present (our fields are strict) |
-| `range(of:in:for:)`, `minimumRange(of:)`, `maximumRange(of:)` | not present |
+| `date(from: DateComponents) -> Date?` | not present |
+| `dateComponents(_: Set<Component>, from: Date)` | not present (our fields are strict) |
+| `dateComponents(_: Set<Component>, from: Date, to: Date)` | not present |
+| `date(byAdding: DateComponents, to: Date, wrappingComponents:)` | derivable from `DateArithmetic`, needs binding |
+| `minimumRange(of:)`, `maximumRange(of:)`, `range(of:in:for:)` | not present |
 | `ordinality(of:in:for:)` | not present |
 | `dateInterval(of:for:)` | not present |
-| `nextDate(after:matching:matchingPolicy:repeatedTimePolicy:direction:)` | not present |
-| `enumerateDates(startingAfter:matching:…)` | not present |
-| `isDateInWeekend`, `dateIntervalOfWeekend`, `nextWeekend` | not present |
-| `startOfDay(for:)`, `isDateInToday(_:)`, `isDate(_:inSameDayAs:)` | not present |
-| `compare(_:to:toGranularity:)` | not present |
-| `date(bySetting:value:of:)`, `date(bySettingHour:minute:second:of:…)` | not present |
-| `date(byAdding:value:to:)` (Foundation-shaped) | derivable from existing `DateArithmetic`, needs binding |
-| `isRepeatedDay` (DST fall-back) | partial (`DateStatus.repeated` exists for Hindu); needs DST extension |
+| `isDateInWeekend(_:)` | not present |
+| `copy(changingLocale:...)` | not present (no state to copy today) |
+| `hash(into:)` | trivial |
 
-See `04-icu4swiftGrowthPlan.md` for the Stage 1 phased plan to
-close this list.
+**Tier 2 — Stored state on calendar structs:**
+
+- `timeZone: TimeZone` — not present
+- `firstWeekday: Int` — not present
+- `minimumDaysInFirstWeek: Int` — not present
+- `locale: Locale?` — not present
+- `gregorianStartDate: Date?` — not present (Gregorian only)
+
+**Tier 3 — Shared adapter infrastructure:**
+
+- New `Instant` boundary type in `CalendarCore`:
+  `(RataDie, Int64 nanosecondsInDay)`. Exact nanosecond precision,
+  strictly better than Foundation's own `Date` (~100 ns at 2024).
+  Distinct from existing `Moment` (Double fractional RataDie, ~8 µs
+  precision at 2024) — `Moment` stays in `AstronomicalEngine` for
+  astronomy; `Instant` is the Foundation boundary. See
+  `MigrationIssues.md` § 2.
+- `(Date, TimeZone) ↔ Instant` adapter with DST gap / fall-back
+  handling — not present
+- Sparse `DateComponents` bridging — not present
+- `isRepeatedDay` for DST fall-back — partial (`DateStatus.repeated`
+  exists for Hindu; needs DST extension)
+
+### What comes along for free once Tier 1–3 ship
+
+The following Foundation public methods do **not** need
+icu4swift-specific implementation. They live in
+`swift-foundation` above `_CalendarProtocol` and route to Tier 1:
+
+- `nextDate(after:matching:...)` and `enumerateDates(...)`
+- `dates(byAdding:...)`, `dates(byMatching:...)` — sequence APIs
+- `Calendar.RecurrenceRule` — RRULE-shaped iteration
+- `startOfDay`, `isDateInToday`, `isDateInYesterday`,
+  `isDateInTomorrow`, `isDate(_:inSameDayAs:)`,
+  `isDate(_:equalTo:toGranularity:)`
+- `compare(_:to:toGranularity:)`
+- `date(bySetting:value:of:)`, `date(bySettingHour:...)`
+- `date(_:matchesComponents:)`
+- `dateIntervalOfWeekend(containing:)` and the non-inout
+  `nextWeekend(startingAfter:direction:)` return variants
+- `component(_ Component, from: Date)`
+- `date(byAdding: Component, value:, to:, wrappingComponents:)`
+  — single-component overload
+
+**This is the key scope correction.** Earlier drafts of this doc
+implied icu4swift had to build ~15–20 surface methods. The real
+Stage 1 surface is 10 primitives + state + adapter. See
+`04-icu4swiftGrowthPlan.md` § "What needs to be added in Stage 1"
+for the full three-tier breakdown and phasing.
 
 ## Explicit non-gaps
 

@@ -114,49 +114,71 @@ Look at `_CalendarGregorian` (`Calendar_Gregorian.swift` in
 absolute Date + timeZone
     │
     ▼ (add tz offset; split)
-┌─────────────────┐   ┌──────────────────────────┐
-│ RataDie (day)   │   │ secondsInDay ∈ [0, 86400)│
-└─────────────────┘   └──────────────────────────┘
+┌─────────────────┐   ┌──────────────────────────────┐
+│ RataDie (day)   │   │ nanosecondsInDay (Int64)     │
+│ Int64           │   │ 0 ..< 86_400_000_000_000     │
+└─────────────────┘   └──────────────────────────────┘
     │                          │
-    ▼ calendar math             ▼ trivial arithmetic
-Y, M, D, era, week, …     hour, minute, second, ns
+    ▼ calendar math             ▼ integer arithmetic
+Y, M, D, era, week, …     hour, minute, second, nanosecond
+```
+
+The two pieces together form a single boundary value:
+
+```swift
+public struct Instant: Sendable, Equatable, Comparable {
+    public let rataDie: RataDie          // Int64 day count
+    public let nanosecondsInDay: Int64   // 0 ..< 86_400_000_000_000
+}
 ```
 
 icu4swift's RataDie-first model **is** this pattern. What we need to
 add is the adapter that:
 
-1. Takes `(Date, TimeZone)` → `(RataDie, secondsInDay)`.
-2. Hands `RataDie` to the calendar for Y/M/D/era/week fields.
-3. Computes H/M/S/ns directly from `secondsInDay`.
-4. Handles DST transitions (where a civil day is not 86400 s long) at
-   the `(Date, TimeZone) ↔ RataDie` boundary — the calendar itself
-   never sees DST.
+1. Takes `(Date, TimeZone)` → `Instant`.
+2. Hands `Instant.rataDie` to the calendar for Y/M/D/era/week fields.
+3. Decomposes `Instant.nanosecondsInDay` into hour / minute / second
+   / nanosecond via integer arithmetic.
+4. Handles DST transitions (where a civil day is not 86400 s long)
+   inside the `(Date, TimeZone) ↔ Instant` boundary — the calendar
+   itself never sees DST.
 
 The adapter is small, well-understood, and already implemented in
 Foundation for Gregorian.
 
-### Sub-second precision where it matters
+### Why `Instant` uses Int64 nanoseconds, not Double fractional RataDie
 
-icu4swift already has sub-second precision where calendar math
-actually needs it: the `Moment` type in `AstronomicalEngine` is a
-fractional Julian Day (`Double`, sub-microsecond precision). It is
-used for Moshier new-moon and solar-longitude calculations that drive
-the Chinese, Hindu, Islamic-astronomical, and Persian calendars.
+The subtlety: you cannot use the existing `Moment` type (Double
+fractional RataDie, from `AstronomicalEngine`) as the boundary
+representation. For 2024-era dates, a Double fractional RataDie has
+only about 10 decimal digits of fractional precision, which works out
+to ~8 µs at the day scale — **worse than Foundation's own
+`Date.timeIntervalSinceReferenceDate`**, which is ~100 ns at the same
+era. `Moment` is the right type for astronomy (where Moshier spans
+geological timescales at micro-arcsecond angular precision over
+millennia) but is the wrong type for Foundation bridging.
 
-The *output* of those calculations is a civil RataDie — the day
-containing the sunrise after the new moon. The *input* uses fractional
-JD. That boundary is already correct and does not change.
+`Instant`, using explicit `Int64` nanoseconds-in-day, is exact at
+nanosecond precision at every date — strictly better than, and
+perfectly round-trippable against, Foundation's `Date`.
 
-### If we ever did need millisecond resolution inside the calendar
+### Sub-second precision where calendar math actually needs it
 
-(We don't.) It would still not be a problem. Options:
+`Moment` stays as it is for `AstronomicalEngine`: fractional Julian
+Day in Double, for Moshier new-moon and solar-longitude calculations
+that drive the Chinese, Hindu, Islamic-astronomical, and Persian
+calendars. The *output* of those calculations is a civil RataDie
+(the day containing the sunrise after the new moon). `Moment` and
+`Instant` serve different purposes and do not interact.
 
-- Use `Double` fractional RataDie (already modeled by `Moment`).
-- Use `Int64` ms-since-RataDie-epoch.
+### Precision summary
 
-Either is a drop-in for anywhere a RataDie is used today. The
-algorithms do not care about the backing type as long as integer-day
-arithmetic is cheap.
+| Type | Precision at 2024 | Use |
+|---|---|---|
+| Foundation `Date` | ~100 ns | public API boundary |
+| **`Instant` (proposed)** | **exact 1 ns** | **icu4swift ↔ Foundation boundary** |
+| `RataDie` (existing) | 1 day (whole) | calendar math core |
+| `Moment` (existing) | ~8 µs | astronomical engine internals |
 
 ---
 
@@ -165,9 +187,9 @@ arithmetic is cheap.
 | Concern | Answer |
 |---|---|
 | Foundation mutability | Maps onto value types with stored properties. Zero friction. Removes a lock compared to `_CalendarICU`. |
-| ICU millisecond basis | Foundation does not expose it. An adapter translates `Date → (RataDie, secondsInDay)`. |
-| Sub-day time math | Handled by the adapter as seconds-since-midnight arithmetic, never by the calendar backend. |
-| Could icu4swift extend to milliseconds if needed | Yes, trivially. `Moment` already does sub-microsecond. Not needed for the port. |
+| ICU millisecond basis | Foundation does not expose it. An adapter translates `Date ↔ Instant` at the boundary. |
+| Sub-day time math | Handled by the adapter as integer-nanosecond arithmetic inside `Instant`, never by the calendar backend. |
+| Sub-day precision | **Exact nanosecond**, via `Instant`'s `Int64 nanosecondsInDay` — strictly better than Foundation's own `Date` (~100 ns at 2024). |
 
 ### Implication for the plan
 
@@ -177,8 +199,9 @@ Stage 1 of the port (see `00-Overview.md`) is:
 - Stored properties on each calendar struct for the Foundation-level
   knobs (`timeZone`, `firstWeekday`, `minimumDaysInFirstWeek`,
   `locale`, `gregorianStartDate`).
-- An adapter layer that maps `(Date, TimeZone)` to `(RataDie,
-  secondsInDay)` and back.
+- A new `Instant` boundary type in `CalendarCore` (`(RataDie,
+  Int64 nanosecondsInDay)`) and an adapter layer that maps
+  `(Date, TimeZone) ↔ Instant` losslessly.
 - The additional API surface Foundation expects on top of that
   (`range`, `ordinality`, `dateInterval`, `nextDate(after:matching:)`,
   etc.) — which is orthogonal to the mutability/millisecond questions

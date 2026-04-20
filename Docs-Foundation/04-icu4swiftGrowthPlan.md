@@ -90,101 +90,196 @@ From `CalendarProtocol` and the concrete calendar types:
 
 ## What needs to be added in Stage 1
 
-These are the capabilities Foundation exposes on its public
-`Calendar` API that icu4swift does not yet provide. The
-implementation will not require ucal-style mutation — each builds
-as a pure function on top of the existing calendar-math core.
+Foundation's public `Calendar` API exposes ~41 public methods plus
+the `Calendar.RecurrenceRule` subsystem. **That does not mean
+icu4swift has to implement 41 things.** The vast majority of those
+41 methods are implemented **once, generically**, in
+`swift-foundation`'s `Calendar` struct extensions — they delegate
+to a small set of primitive methods on `_CalendarProtocol`, which
+the backend (us) must provide. Everything above that layer comes
+along for free when we ship the primitives.
 
-### State on the calendar struct (stored properties)
+We therefore split the work into three tiers.
 
-- `timeZone: TimeZone` — all calendar operations consume a
-  `TimeZone`.
-- `firstWeekday: Int` — 1–7, drives week-of-year math.
-- `minimumDaysInFirstWeek: Int` — 1–7, drives week-of-year math.
-- `locale: Locale?` — for preferred-weekday / min-days resolution.
-- `gregorianStartDate: Date?` — Gregorian calendar's Julian-cutover
-  configuration.
+### Tier 1 — Backend primitives (icu4swift must implement)
 
-### Adapter layer — `(Date, TimeZone) ↔ (RataDie, secondsInDay)`
+These are the methods declared by `_CalendarProtocol` in
+`swift-foundation/Sources/FoundationEssentials/Calendar/Calendar_Protocol.swift`
+that every backend must provide. They are the **only** Foundation-shaped
+methods we need to actually implement on icu4swift's side:
 
-The boundary between Foundation's absolute-time `Date` and our
-RataDie-based calendar math. TZ offset application, DST gap/fall-back
-handling, second/nanosecond extraction. See
-`TIMEZONE_CONSIDERATION.md` for the scope and
-`MigrationIssues.md` for the RataDie-vs-milliseconds discussion.
+- **Composition** — `date(from: DateComponents) -> Date?`
+- **Decomposition** — `dateComponents(_: Set<Component>, from: Date) -> DateComponents`
+- **Difference** — `dateComponents(_: Set<Component>, from: Date, to: Date) -> DateComponents`
+- **Arithmetic** — `date(byAdding: DateComponents, to: Date, wrappingComponents: Bool) -> Date?`
+- **Ranges** — `minimumRange(of:) -> Range<Int>?`, `maximumRange(of:) -> Range<Int>?`, `range(of:in:for:) -> Range<Int>?`
+- **Ordinality** — `ordinality(of: Component, in: Component, for: Date) -> Int?`
+- **Interval** — `dateInterval(of: Component, for: Date) -> DateInterval?`
+  (plus the `inout`-based overload, same primitive)
+- **Weekend test** — `isDateInWeekend(Date) -> Bool`
+- **Copying** — `copy(changingLocale:timeZone:firstWeekday:minimumDaysInFirstWeek:gregorianStartDate:)`
+- **Hashing** — `hash(into:)`
 
-### DateComponents round-trip (sparse)
+That's it for the backend contract. Roughly **10 methods**, all
+pure functions of `(Date, Calendar, Component)`, none requiring a
+mutation protocol.
 
-Foundation's `DateComponents` is sparse — any subset of fields may
-be set or read. icu4swift needs to:
+### Tier 2 — Stored state on the calendar struct
 
-- Accept `DateComponents` → construct a `Date` (composition).
-- Produce `DateComponents` from a `Date` + requested components
-  (decomposition).
-- Handle sparse-value semantics (missing fields, over-specified
-  combinations, validity rules).
+Each icu4swift calendar type grows these stored properties so the
+Tier 1 methods have the configuration they need. The existing
+concrete calendars (`Hebrew`, `Persian`, etc.) are value types with
+no state today; adding them is mechanical.
 
-### Foundation query API
+- `timeZone: TimeZone`
+- `firstWeekday: Int` (1–7)
+- `minimumDaysInFirstWeek: Int` (1–7)
+- `locale: Locale?`
+- `gregorianStartDate: Date?` (Gregorian only)
 
-Each of these is a pure function of `(Date, Calendar, Component)`:
+### Tier 3 — Adapter infrastructure shared across all backends
 
-- `range(of:in:for:)`, `minimumRange(of:)`, `maximumRange(of:)`
-- `ordinality(of:in:for:)`
-- `dateInterval(of:for:)`
-- `nextDate(after:matching:matchingPolicy:repeatedTimePolicy:direction:)`
-- `enumerateDates(startingAfter:matching:matchingPolicy:…)`
-- `isDateInWeekend(_:)`
-- `dateIntervalOfWeekend(containing:start:interval:)`
-- `nextWeekend(startingAfter:start:interval:direction:)`
-- `startOfDay(for:)`, `isDateInToday(_:)`, `isDate(_:inSameDayAs:)`
-- `compare(_:to:toGranularity:)`
-- `date(bySetting:value:of:)`, `date(bySettingHour:minute:second:of:…)`
-- `date(byAdding:value:to:)` / `date(byAdding:to:wrappingComponents:)`
+- **`Instant` boundary type (new).** Lives in `CalendarCore`.
+  Defined as:
 
-Most of these decompose into primitives that our core already has
-(atomic decompose + compose, field accessors, arithmetic). A few
-(notably `nextDate` / `enumerateDates`) are genuinely substantial
-on their own — see `OPEN_ISSUES.md` Issue 3 and the
-`Calendar_Enumerate.swift` reference in `swift-foundation`.
+  ```swift
+  public struct Instant: Sendable, Equatable, Comparable {
+      public let rataDie: RataDie          // Int64 day count
+      public let nanosecondsInDay: Int64   // 0 ..< 86_400_000_000_000
+  }
+  ```
+
+  Represents a point in time at exact nanosecond precision — strictly
+  better than Foundation's `Date.timeIntervalSinceReferenceDate`
+  (~100 ns at 2024 era) — and round-trippable without loss. This is
+  **not** the existing `Moment` type from `AstronomicalEngine`:
+  `Moment` is Double fractional RataDie and has only ~8 µs precision
+  at the same era, which would be a step backward at the Foundation
+  boundary. `Moment` continues to serve astronomy; `Instant` serves
+  Foundation bridging. See `MigrationIssues.md` § 2 for the full
+  precision analysis.
+
+- **TZ adapter** — `(Date, TimeZone) ↔ Instant`. Integer-math
+  conversion: subtract reference / timezone offsets, split into
+  whole-day `RataDie` + nanosecond-within-day. DST gap / fall-back
+  handling lives here; the calendar core never sees DST. See
+  `TIMEZONE_CONSIDERATION.md` for the scope.
+
+- **Sparse DateComponents bridging** — Foundation's `DateComponents`
+  is a sparse struct (any subset of fields may be set or read). The
+  compose / decompose / difference primitives in Tier 1 all consume
+  or produce it. Missing-field semantics, over-specified field
+  combinations, and validity rules all live in this shared layer.
+  `Instant.nanosecondsInDay` decomposes into H/M/S/ns via pure
+  integer arithmetic (`nsInDay / 3600_000_000_000` → hour, etc.);
+  no Double drift.
+
+### What comes along for free (lives in swift-foundation above `_CalendarProtocol`)
+
+Once Tiers 1–3 ship, these **automatically work** against
+icu4swift-backed calendars — we do not reimplement them:
+
+| Foundation public method | Implemented in swift-foundation via |
+|---|---|
+| `startOfDay(for:)` | `dateInterval(of: .day, for:).start` |
+| `isDateInToday(_:)`, `isDateInYesterday(_:)`, `isDateInTomorrow(_:)` | `isDate(_:inSameDayAs:)` + `Date(timeIntervalSinceNow:)` |
+| `isDate(_:inSameDayAs:)`, `isDate(_:equalTo:toGranularity:)` | `ordinality` + `component(_:from:)` |
+| `compare(_:to:toGranularity:)` | `ordinality` per granularity |
+| `component(_ Component, from: Date)` | single-key `dateComponents(_:from:)` |
+| `date(byAdding: Component, value:, to:, wrappingComponents:)` | single-component overload of the arithmetic primitive |
+| `date(bySetting: Component, value:, of:)` | decompose → mutate → compose |
+| `date(bySettingHour:minute:second:of:...)` | same |
+| `date(_:matchesComponents:)` | decompose + compare to sparse DC |
+| `dateIntervalOfWeekend(containing:)`, `nextWeekend(startingAfter:direction:)` | return-variant wrappers around `isDateInWeekend` + `dateInterval(of: .weekOfMonth, for:)` |
+| `nextDate(after:matching:matchingPolicy:repeatedTimePolicy:direction:)` | generic in `Calendar_Enumerate.swift`; uses `dateInterval`, `date(byAdding:)`, `dateComponents(_:from:)` |
+| `enumerateDates(startingAfter:matching:...)` | same; `nextDate` built on top of it |
+| `dates(byAdding:...)`, `dates(byMatching:...)` | AsyncSequence wrappers around `nextDate` / `date(byAdding:)` |
+| `Calendar.RecurrenceRule` | generic machinery in `Calendar+Recurrence.swift` on top of `enumerateDates` |
+| `_CalendarBridged` path (NSCalendar) | Foundation-internal; not our concern |
+
+**This is the key insight for scoping Stage 1.** The ceiling isn't
+41 methods — it's 10 primitives + state + adapter. `nextDate`,
+`enumerateDates`, `RecurrenceRule`, the sequence APIs, every
+convenience wrapper — all of it routes through the same 10
+primitives. Implement them correctly and a backend "just works"
+across every Foundation API Apple ships now or ever will ship
+through this contract.
+
+### Risk concentrated in four primitives
+
+Of the 10 primitives, risk is not uniform. Four carry most of the
+design work:
+
+1. **`date(from: DateComponents)`** — composition. Sparse-field
+   semantics, validity rules (over-specified combinations,
+   ambiguous cases), DST gap/fall-back resolution at compose time.
+2. **`dateComponents(_:from:)`** — decomposition. Which
+   components are requested, how week-of-year derives from
+   `firstWeekday` + `minimumDaysInFirstWeek`, how era + year +
+   leap-month interact.
+3. **`dateComponents(_:from:to:)`** — difference. The semantics
+   of "what is `date2 - date1` in years + months + days" is
+   subtle; different `matchingPolicy` semantics apply.
+4. **`date(byAdding:to:wrappingComponents:)`** — arithmetic with
+   month-end overflow handling (Feb 30 → Feb 28), wrapping vs
+   carry. Our `DateArithmetic` module already implements the
+   Temporal-spec algorithms; binding to Foundation's
+   `DateComponents` semantics is the work.
+
+`range` / `ordinality` / `dateInterval` / `isDateInWeekend` are
+shallower — mostly straightforward once decomposition is solid.
+
+The big concern earlier in `OPEN_ISSUES.md` Issue 3 about
+`nextDate` / `enumerateDates` stands, but is **not** icu4swift's
+problem to solve — the complexity lives in
+`Calendar_Enumerate.swift`, inherited when we plug in.
 
 ## Proposed phasing for Stage 1
 
-*To be refined. Each phase has its own acceptance criteria; each
-ends with benchmarks against `_CalendarICU` for the operations it
-added.*
+*To be refined. Each phase ends with benchmarks against
+`_CalendarICU` for the primitives it added, per
+`05-PerformanceParityGate.md`.*
 
-1. **Phase 1a — Stored state + TZ adapter.** Add the five stored
-   properties to every calendar struct. Implement `(Date, TZ) ↔
-   (RataDie, secondsInDay)`. No new operations yet; just the
-   foundation.
-2. **Phase 1b — Sparse DateComponents round-trip.** Compose and
-   decompose with sparse field sets.
-3. **Phase 1c — Range / ordinality / dateInterval.** The cheap,
-   pure-function query APIs.
-4. **Phase 1d — `isDateInWeekend` + weekend interval + nextWeekend.**
-   Requires locale weekend data; possible interaction with Locale
-   layer.
-5. **Phase 1e — Arithmetic (`date(byAdding:...)`,
-   `compare(_:to:toGranularity:)`).** Bridge our existing
-   `DateArithmetic` module to Foundation's component-based add.
-6. **Phase 1f — `nextDate` + `enumerateDates` + matching policies +
-   repeated-time handling.** The biggest piece; deserves its own
-   sub-phase. Includes DST-gap / fall-back / match-policy semantics.
+1. **Phase 1a — Tier 2 + Tier 3.** Stored state on calendar
+   structs, TZ adapter, sparse DateComponents infrastructure.
+   No new primitives yet; just the plumbing Tier 1 will build on.
+2. **Phase 1b — Tier 1 composition/decomposition.** `date(from:)`
+   and `dateComponents(_:from:)`. Sparse-field semantics,
+   validity rules, DST gap/fall-back at compose time.
+3. **Phase 1c — Tier 1 difference.** `dateComponents(_:from:to:)`
+   with the right matching-policy semantics for each component
+   combination.
+4. **Phase 1d — Tier 1 arithmetic.** `date(byAdding:to:wrappingComponents:)`
+   bridging icu4swift's existing `DateArithmetic` module to
+   Foundation's DateComponents-based interface. Month-end
+   overflow, wrapping vs carry.
+5. **Phase 1e — Tier 1 ranges + ordinality + interval.**
+   `minimumRange`, `maximumRange`, `range(of:in:for:)`,
+   `ordinality(of:in:for:)`, `dateInterval(of:for:)`. Shallower
+   than 1b-1d; mostly lookups and week-of-year arithmetic.
+6. **Phase 1f — Tier 1 weekend.** `isDateInWeekend` + the locale
+   weekend-data hooks.
 
-Each phase ends with a performance comparison against
-`_CalendarICU` for the operations added in that phase. A phase
-passes when it meets the acceptance criteria in
-`05-PerformanceParityGate.md`.
+After Phase 1f, the backend contract is complete. `nextDate`,
+`enumerateDates`, `RecurrenceRule`, and all 30+ convenience
+methods come along for free via `swift-foundation`'s existing
+generic implementations — that work happens in Stage 2 (plumbing
+the backend into the Foundation dispatch) not in Stage 1.
 
 ## Exit criterion for Stage 1
 
-icu4swift, compiled as a standalone package, passes a porting of
-Foundation's `CalendarTests.swift` plus any new tests for
-Foundation-shaped operations. Performance benchmarks against
-`_CalendarICU` meet the parity gate thresholds for the Foundation
-query API specifically (not just the existing raw RataDie
-round-trips). At that point Stage 2 — plumbing the icu4swift
-backend into `swift-foundation` — can begin.
+icu4swift ships all 10 `_CalendarProtocol` primitives with:
+
+- Functional parity: a porting of the relevant subset of
+  Foundation's `CalendarTests.swift` passes.
+- Performance parity: `05-PerformanceParityGate.md` thresholds
+  met on the primitives for every calendar.
+- Stored state and adapter layer in place.
+
+At that point Stage 2 begins — we plug icu4swift-backed classes
+into `_CalendarProtocol` inside `swift-foundation`, and the full
+41-method Foundation API + `RecurrenceRule` light up against our
+backend for free.
 
 ## See also
 
