@@ -1,7 +1,7 @@
-// Instant — design stub.
+// CivilInstant — design stub.
 //
 // This file is intentionally empty. It exists to hold the planned
-// `Instant` type introduced during the Foundation port (Stage 1,
+// `CivilInstant` type introduced during the Foundation port (Stage 1,
 // Phase 1a) as the nanosecond-exact boundary between Foundation's
 // `Date` and icu4swift's RataDie-based calendar math.
 //
@@ -9,7 +9,7 @@
 //
 // ## Planned type
 //
-//     public struct Instant: Sendable, Equatable, Comparable {
+//     public struct CivilInstant: Sendable, Equatable, Comparable {
 //         public let rataDie: RataDie          // Int64 day count
 //         public let nanosecondsInDay: Int64   // 0 ..< 86_400_000_000_000
 //     }
@@ -23,27 +23,27 @@
 // Using `Moment` as the boundary would make icu4swift lose precision
 // vs. Foundation — unacceptable.
 //
-// `Instant`'s integer `nanosecondsInDay` is exact at all dates and
+// `CivilInstant`'s integer `nanosecondsInDay` is exact at all dates and
 // round-trips Foundation `Date` losslessly.
 //
 // ## Conversion
 //
-// - `(Foundation.Date, TimeZone) -> Instant`:
+// - `(Foundation.Date, TimeZone) -> CivilInstant`:
 //     add TZ offset + reference-date offset,
 //     split into whole-day rataDie + ns-within-day.
-// - `Instant -> (Foundation.Date, TimeZone)`:
+// - `CivilInstant -> (Foundation.Date, TimeZone)`:
 //     inverse. Reassemble, subtract offsets.
 // - DST gap / fall-back handling lives here; the calendar math
 //   layer never sees DST.
 //
 // ## Relationship to existing types
 //
-// - `RataDie` (CalendarCore): unchanged. `Instant.rataDie` feeds
+// - `RataDie` (CalendarCore): unchanged. `CivilInstant.rataDie` feeds
 //   into the existing `calendar.fromRataDie` / `toRataDie` path.
 // - `Moment` (AstronomicalEngine): unchanged. Continues to serve
-//   Moshier astronomy. `Instant` and `Moment` do not interact.
+//   Moshier astronomy. `CivilInstant` and `Moment` do not interact.
 // - `Date<C>` (CalendarCore): unchanged. `Date<C>` is the pure
-//   calendar-math view; `Instant` is a separate concept for
+//   calendar-math view; `CivilInstant` is a separate concept for
 //   absolute-time bridging.
 //
 // See:

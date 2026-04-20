@@ -139,11 +139,11 @@ no state today; adding them is mechanical.
 
 ### Tier 3 — Adapter infrastructure shared across all backends
 
-- **`Instant` boundary type (new).** Lives in `CalendarCore`.
+- **`CivilInstant` boundary type (new).** Lives in `CalendarCore`.
   Defined as:
 
   ```swift
-  public struct Instant: Sendable, Equatable, Comparable {
+  public struct CivilInstant: Sendable, Equatable, Comparable {
       public let rataDie: RataDie          // Int64 day count
       public let nanosecondsInDay: Int64   // 0 ..< 86_400_000_000_000
   }
@@ -155,11 +155,11 @@ no state today; adding them is mechanical.
   **not** the existing `Moment` type from `AstronomicalEngine`:
   `Moment` is Double fractional RataDie and has only ~8 µs precision
   at the same era, which would be a step backward at the Foundation
-  boundary. `Moment` continues to serve astronomy; `Instant` serves
+  boundary. `Moment` continues to serve astronomy; `CivilInstant` serves
   Foundation bridging. See `MigrationIssues.md` § 2 for the full
   precision analysis.
 
-- **TZ adapter** — `(Date, TimeZone) ↔ Instant`. Integer-math
+- **TZ adapter** — `(Date, TimeZone) ↔ CivilInstant`. Integer-math
   conversion: subtract reference / timezone offsets, split into
   whole-day `RataDie` + nanosecond-within-day. DST gap / fall-back
   handling lives here; the calendar core never sees DST. See
@@ -170,7 +170,7 @@ no state today; adding them is mechanical.
   compose / decompose / difference primitives in Tier 1 all consume
   or produce it. Missing-field semantics, over-specified field
   combinations, and validity rules all live in this shared layer.
-  `Instant.nanosecondsInDay` decomposes into H/M/S/ns via pure
+  `CivilInstant.nanosecondsInDay` decomposes into H/M/S/ns via pure
   integer arithmetic (`nsInDay / 3600_000_000_000` → hour, etc.);
   no Double drift.
 

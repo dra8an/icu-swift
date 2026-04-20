@@ -126,7 +126,7 @@ Y, M, D, era, week, …     hour, minute, second, nanosecond
 The two pieces together form a single boundary value:
 
 ```swift
-public struct Instant: Sendable, Equatable, Comparable {
+public struct CivilInstant: Sendable, Equatable, Comparable {
     public let rataDie: RataDie          // Int64 day count
     public let nanosecondsInDay: Int64   // 0 ..< 86_400_000_000_000
 }
@@ -135,18 +135,18 @@ public struct Instant: Sendable, Equatable, Comparable {
 icu4swift's RataDie-first model **is** this pattern. What we need to
 add is the adapter that:
 
-1. Takes `(Date, TimeZone)` → `Instant`.
-2. Hands `Instant.rataDie` to the calendar for Y/M/D/era/week fields.
-3. Decomposes `Instant.nanosecondsInDay` into hour / minute / second
+1. Takes `(Date, TimeZone)` → `CivilInstant`.
+2. Hands `CivilInstant.rataDie` to the calendar for Y/M/D/era/week fields.
+3. Decomposes `CivilInstant.nanosecondsInDay` into hour / minute / second
    / nanosecond via integer arithmetic.
 4. Handles DST transitions (where a civil day is not 86400 s long)
-   inside the `(Date, TimeZone) ↔ Instant` boundary — the calendar
+   inside the `(Date, TimeZone) ↔ CivilInstant` boundary — the calendar
    itself never sees DST.
 
 The adapter is small, well-understood, and already implemented in
 Foundation for Gregorian.
 
-### Why `Instant` uses Int64 nanoseconds, not Double fractional RataDie
+### Why `CivilInstant` uses Int64 nanoseconds, not Double fractional RataDie
 
 The subtlety: you cannot use the existing `Moment` type (Double
 fractional RataDie, from `AstronomicalEngine`) as the boundary
@@ -158,7 +158,7 @@ era. `Moment` is the right type for astronomy (where Moshier spans
 geological timescales at micro-arcsecond angular precision over
 millennia) but is the wrong type for Foundation bridging.
 
-`Instant`, using explicit `Int64` nanoseconds-in-day, is exact at
+`CivilInstant`, using explicit `Int64` nanoseconds-in-day, is exact at
 nanosecond precision at every date — strictly better than, and
 perfectly round-trippable against, Foundation's `Date`.
 
@@ -169,14 +169,14 @@ Day in Double, for Moshier new-moon and solar-longitude calculations
 that drive the Chinese, Hindu, Islamic-astronomical, and Persian
 calendars. The *output* of those calculations is a civil RataDie
 (the day containing the sunrise after the new moon). `Moment` and
-`Instant` serve different purposes and do not interact.
+`CivilInstant` serve different purposes and do not interact.
 
 ### Precision summary
 
 | Type | Precision at 2024 | Use |
 |---|---|---|
 | Foundation `Date` | ~100 ns | public API boundary |
-| **`Instant` (proposed)** | **exact 1 ns** | **icu4swift ↔ Foundation boundary** |
+| **`CivilInstant` (proposed)** | **exact 1 ns** | **icu4swift ↔ Foundation boundary** |
 | `RataDie` (existing) | 1 day (whole) | calendar math core |
 | `Moment` (existing) | ~8 µs | astronomical engine internals |
 
@@ -187,9 +187,9 @@ calendars. The *output* of those calculations is a civil RataDie
 | Concern | Answer |
 |---|---|
 | Foundation mutability | Maps onto value types with stored properties. Zero friction. Removes a lock compared to `_CalendarICU`. |
-| ICU millisecond basis | Foundation does not expose it. An adapter translates `Date ↔ Instant` at the boundary. |
-| Sub-day time math | Handled by the adapter as integer-nanosecond arithmetic inside `Instant`, never by the calendar backend. |
-| Sub-day precision | **Exact nanosecond**, via `Instant`'s `Int64 nanosecondsInDay` — strictly better than Foundation's own `Date` (~100 ns at 2024). |
+| ICU millisecond basis | Foundation does not expose it. An adapter translates `Date ↔ CivilInstant` at the boundary. |
+| Sub-day time math | Handled by the adapter as integer-nanosecond arithmetic inside `CivilInstant`, never by the calendar backend. |
+| Sub-day precision | **Exact nanosecond**, via `CivilInstant`'s `Int64 nanosecondsInDay` — strictly better than Foundation's own `Date` (~100 ns at 2024). |
 
 ### Implication for the plan
 
@@ -199,9 +199,9 @@ Stage 1 of the port (see `00-Overview.md`) is:
 - Stored properties on each calendar struct for the Foundation-level
   knobs (`timeZone`, `firstWeekday`, `minimumDaysInFirstWeek`,
   `locale`, `gregorianStartDate`).
-- A new `Instant` boundary type in `CalendarCore` (`(RataDie,
+- A new `CivilInstant` boundary type in `CalendarCore` (`(RataDie,
   Int64 nanosecondsInDay)`) and an adapter layer that maps
-  `(Date, TimeZone) ↔ Instant` losslessly.
+  `(Date, TimeZone) ↔ CivilInstant` losslessly.
 - The additional API surface Foundation expects on top of that
   (`range`, `ordinality`, `dateInterval`, `nextDate(after:matching:)`,
   etc.) — which is orthogonal to the mutability/millisecond questions
