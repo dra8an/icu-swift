@@ -104,15 +104,13 @@ provide:**
 
 **Tier 3 — Shared adapter infrastructure:**
 
-- New `CivilInstant` boundary type in `CalendarCore`:
-  `(RataDie, Int64 nanosecondsInDay)`. Exact nanosecond precision,
-  strictly better than Foundation's own `Date` (~100 ns at 2024).
-  Distinct from existing `Moment` (Double fractional RataDie, ~8 µs
-  precision at 2024) — `Moment` stays in `AstronomicalEngine` for
-  astronomy; `CivilInstant` is the Foundation boundary. See
-  `MigrationIssues.md` § 2.
-- `(Date, TimeZone) ↔ CivilInstant` adapter with DST gap / fall-back
-  handling — not present
+- `(Date, TimeZone) ↔ (Int rataDie, Double fractionalDay)` adapter.
+  Same representation Foundation's `_CalendarGregorian` already uses
+  (`var julianDate: Double` + `func julianDay() -> Int` in
+  `Calendar_Gregorian.swift`). No new named type — a pair of free
+  functions. DST gap / fall-back handling lives in the conversion.
+  See `MigrationIssues.md` § 2 for why we align with Foundation's
+  pattern rather than inventing a separate type.
 - Sparse `DateComponents` bridging — not present
 - `isRepeatedDay` for DST fall-back — partial (`DateStatus.repeated`
   exists for Hindu; needs DST extension)

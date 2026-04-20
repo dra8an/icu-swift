@@ -1,205 +1,283 @@
 # icu4swift — Session Handoff
 
-*Written 2026-04-16 for context-clearing handoff. Consult this first when resuming work on this project.*
+*Written 2026-04-20. Consult this first when resuming work on this project.*
 
 ## What is this project
 
-**icu4swift** is a Swift package — a library for world calendar systems. It ports ICU4X/ICU4C calendar algorithms to pure Swift. No Foundation dependency, no external deps, Swift 6 with strict concurrency.
+**icu4swift** is a Swift package — a library for world calendar
+systems. It ports ICU4X/ICU4C calendar algorithms to pure Swift.
+No Foundation dependency, no external deps, Swift 6 with strict
+concurrency.
 
-**Output:** a library (no executable). Consumers import modules like `CalendarCore`, `CalendarSimple`, `CalendarComplex`, `CalendarAstronomical`, `CalendarHindu`, `CalendarJapanese`, `DateArithmetic`.
+**Output:** a library (no executable). Consumers import modules like
+`CalendarCore`, `CalendarSimple`, `CalendarComplex`, `CalendarAstronomical`,
+`CalendarHindu`, `CalendarJapaneseSupport`, `DateArithmetic`.
 
-## Current state at handoff
+**Active narrative since 2026-04-17:** icu4swift is the staging
+ground for a **Foundation port**. The endgame is to replace
+`swift-foundation`'s ICU4C-backed calendar path with pure-Swift
+implementations derived from icu4swift. When the port completes,
+`_CalendarICU` is deleted and icu4swift is archived. See
+**`Docs-Foundation/`** (not `Docs/`) for everything about that
+effort.
 
-- **23 calendars implemented**, all passing regression tests (1 known Chinese limitation — see below).
-- **321 tests**, full suite runs in ~28 seconds (`swift test -c release`).
-- **Phase 8 (DateFormat) deferred** — user wants to continue calendar/perf work.
-- **Library size: 2.8 MB** compiled (release, x86_64).
-- **Baked data: ~5 KB total** across Chinese, Umm al-Qura, and Hindu solar (all 4 variants).
+## Current state — one-page snapshot
 
-### Calendar inventory
+### Library (icu4swift package)
 
-| Module | Calendars |
-|---|---|
-| CalendarSimple | ISO, Gregorian, Julian, Buddhist, ROC |
-| CalendarComplex | Hebrew, Coptic, Ethiopian, Persian, Indian |
-| CalendarJapanese | Japanese (5 imperial eras: meiji/taisho/showa/heisei/reiwa) |
-| CalendarAstronomical | Islamic Tabular, Islamic Civil, Islamic Umm al-Qura, Chinese, Dangi |
-| CalendarHindu | 4 solar (Tamil, Bengali, Odia, Malayalam), 2 lunisolar (Amanta, Purnimanta) |
+- **28 calendars implemented** (up from 23 on 2026-04-16). New
+  this week: `IslamicAstronomical` (delegating alias over
+  `IslamicUmmAlQura`), `EthiopianAmeteAlem`, `Vietnamese`
+  (= `ChineseCalendar<Vietnam>` at UTC+7). Covers all 28
+  `Foundation.Calendar.Identifier` cases.
+- **338 tests**, full suite runs in ~28 s. One standing failure
+  (Chinese 1906 cluster, 3/2,461 — documented ICU-vs-HKO
+  physical disagreement).
 
-### Regression summary
+### Performance — post-clean-methodology
 
-See `Docs/TestCoverageAndDocs.md` for the master index.
+**Critical update 2026-04-19:** our benchmark harness was leaking
+`#expect` macro overhead (~1.5 µs per call) into every reported
+number, making all pre-2026-04-19 perf figures inflated by
+~1.5 µs. After refactoring the harness across all 5 bench files
+to use a `(warmup, 100k iters, checksum, one #expect after)`
+pattern, the real numbers emerged.
 
-| Calendar | Regression | Reference |
-|---|---|---|
-| Hebrew | 73,414 / 0 | Hebcal (`@hebcal/core`) |
-| Islamic Tabular | 73,414 / 0 | Foundation + convertdate |
-| Islamic Civil | 73,414 / 0 | Foundation + convertdate |
-| Islamic UQ | 4,380 / 0 | Foundation (KACST-derived) |
-| Persian | 3,064 / 0 | Foundation + convertdate |
-| Coptic | 3,266 / 0 | Foundation + convertdate |
-| Ethiopian | 3,266 / 0 | Foundation + convertdate |
-| Indian (Saka) | 3,216 / 0 | Foundation + convertdate |
-| Japanese | 2,744 / 0 | Foundation (era mapping, 1873–2100) |
-| Chinese | **2,461 / 3** | Hong Kong Observatory (1906 cluster, known limit) |
-| Hindu ×4 solar | 1,811 / 0 each | Hindu project Moshier CSVs |
-| Hindu ×2 lunisolar | 55,152 / 0 each | Hindu project Moshier CSVs |
-| Dangi | — | deferred |
-| Simple 5 | n/a (trivial) | unit tests |
+**Actual icu4swift per-round-trip performance (release mode):**
 
-## Performance at handoff
-
-Benchmark suite: `swift test -c release --filter "Benchmark"`. See `Docs/PERFORMANCE.md`.
-
-| Tier | Calendars | µs/date |
+| Tier | Calendars | ns/date |
 |---|---|---:|
-| Arithmetic / baked table | ISO, Gregorian, Julian, Buddhist, ROC, Coptic, Ethiopian, Persian, Hebrew, Indian, Japanese, Islamic ×3, Chinese (baked), Dangi (baked), Hindu solar ×4 (baked) | 2–4 |
-| Moshier fallback | Chinese pre-1901 | ~437 |
-| Hindu lunisolar | Amanta, Purnimanta | ~3,900 |
+| Simple (ISO/Gregorian/Julian/Buddhist/ROC) | 16–19 |
+| Arithmetic (Coptic/Ethiopian/Persian/Japanese/Indian/Hebrew) | 9–96 |
+| Islamic ×3 (Civil/Tabular/UQ) | 20–43 |
+| Chinese/Dangi (baked) | 38–42 |
+| Hindu solar ×4 (baked) | 109–200 |
+| Hindu lunisolar (Moshier, not baked) | ~3.3 ms |
+| Chinese Moshier fallback (1000d span) | 3–26 µs (cache-amortised) |
 
-**⚠ 2026-04-19 PM update:** The numbers above were measured with
-`#expect` inside the hot loop (~1.5 µs overhead per call). After
-cleaning up the benchmark harness, actual per-date costs are
-**10–100× lower**: arithmetic calendars 9–96 ns/date, astronomical
-baked 20–43 ns, Chinese 42 ns. Hindu lunisolar unchanged at ~3.3 ms.
-See `Docs-Foundation/BENCHMARK_RESULTS.md` for the full
-clean-methodology results and vs-Foundation comparison (icu4swift is
-17–285× faster than Foundation's `Calendar` API across the board).
+Hebrew was specifically optimised 2026-04-19 (2.9 µs → 96 ns)
+via `YearData` struct + integer arithmetic + `@inlinable`.
+Persian and Coptic also got small wins via `@inlinable` + binary
+search (Persian).
 
-## Recent big work (session before handoff)
+### Three-way perf comparison vs Foundation / ICU4C
 
-### Baked data refactor — 3 calendars done
+Measured 2026-04-20 via `Scripts/ICU4CCalBench.c` against Homebrew
+ICU4C v78:
 
-All following **store packed year data inside `DateInner`** so field accessors are lock-free bit ops (no cache lookup during arithmetic).
+- **icu4swift beats raw ICU4C's C API by 10–40× on arithmetic
+  calendars and ~1,000× on Chinese.** Foundation's public
+  `Calendar` API adds another ~800 ns wrapper overhead per
+  iteration on top of that.
+- This is NOT a micro-optimisation trick — it's a consequence of
+  API shape. ICU's `ucal_set`/`add`/`roll` contract forces
+  full field recalculation on every read; Foundation's public
+  API doesn't expose that contract; we therefore don't pay for
+  it. See `Docs-Foundation/04-icu4swiftGrowthPlan.md` § "The
+  guiding design principle" for the full argument.
 
-1. **Chinese (1901–2099)** — 199 entries, `PackedChineseYearData` UInt32 (13-bit month lengths + 4-bit leap month + 6-bit new year offset). Source: HKO. **~586 ms → 2.2 µs/date.** File: `Sources/CalendarAstronomical/PackedChineseYear.swift`.
+### Identifier coverage (for Foundation port)
 
-2. **Islamic Umm al-Qura (1300–1600 AH)** — 301 entries, `PackedHijriYearData` UInt16 (12-bit month lengths + sign + 3-bit offset). Source: KACST via ICU4C. Validated against official Saudi government dates. File: `Sources/CalendarAstronomical/IslamicUmmAlQura.swift`.
+All 28 `Foundation.Calendar.Identifier` cases have Swift-native
+backends in icu4swift:
 
-3. **Hindu solar ×4 (~1900–2050)** — 150 entries each, `PackedHinduSolarYearData` (UInt32 monthData: 2 bits × 12 months encoding 29/30/31/32; UInt16 newYearOffset from per-variant `baseNewYear: Int32`). Source: Hindu project Moshier CSVs. **1,334 µs → 2.4 µs/date (Tamil) / ~500× speedup**. File: `Sources/CalendarHindu/PackedHinduSolarYear.swift`.
+- Gregorian, ISO8601, Buddhist, ROC, Japanese — `CalendarSimple` + `CalendarJapanese`
+- Persian, Coptic, Ethiopian (both variants), Indian, Hebrew — `CalendarComplex`
+- Islamic Civil, Tabular, UmmAlQura, Astronomical — `CalendarAstronomical`
+- Chinese, Dangi, Vietnamese — `CalendarAstronomical` (all are `ChineseCalendar<Variant>`)
+- Tamil, Bengali, Odia, Malayalam (solar) — `CalendarHindu`
+- Amanta, Purnimanta (lunisolar) — `CalendarHindu`
+- `.gujarati/.kannada/.marathi/.telugu/.vikram`: mapping TBD
+  (likely aliases of Amanta/Purnimanta with regional display
+  labels). Tracked in `OPEN_ISSUES.md` Issue 6 and `07-OpenQuestions.md`.
 
-### Odia gotcha (fixed)
+## The Foundation port effort — what happened in this session
 
-Odia has `firstRashi = 1, yearStartRashi = 6`. **Its year starts at regional month 6** (Ashvina/September), not month 1 — the year runs chronologically 6,7,…,12,1,2,…,5. The other three Hindu solar variants have `yearStartMonth = 1`.
+The big thread 2026-04-17 through 2026-04-20. **Read
+`Docs-Foundation/MASTER.md` first** — it's the doc index. Then
+`STATUS.md` (current state), `NEXT.md` (one next task),
+`PIPELINE.md` (backlog), `OPEN_ISSUES.md` (risks), and
+`00-Overview.md` (mission).
 
-`yearStartMonth` is computed at compile time from variant static constants:
-```swift
-UInt8(((V.yearStartRashi - V.firstRashi + 12) % 12) + 1)
-```
-Tamil/Bengali/Malayalam → 1. Odia → 6. Not stored in packed data (saves 4 bits per entry and avoids redundancy).
+### ⚠ Before touching anything sub-day-related, READ THIS
 
-### UInt16 offset optimization
+**`Docs-Foundation/SUBDAY_BOUNDARY.md` is the authoritative decision record for how icu4swift handles sub-day time at the Foundation boundary.** Two sessions in a row confused this. The decision is: **match `_CalendarGregorian`'s pattern — pair of adapter functions on `Foundation.Date`, no new named type**. `CivilInstant` was proposed and **rejected**. If a resumed session starts reaching for an Int64-nanoseconds-in-day struct, stop and re-read `SUBDAY_BOUNDARY.md` first.
 
-Hindu solar originally stored each year's `newYear: Int32` (4 bytes). Replaced with per-variant `baseNewYear: Int32` + `newYearOffset: UInt16` (2 bytes per year). Saved **1,184 bytes** (~19% of Hindu solar data). Max observed offset: 54,423 (UInt16 max is 65,535).
+**`Docs/RDvsJD.md`** is the closed decision record for "why RataDie and not Julian Day?" — read it if anyone asks why we don't use JD as the universal pivot. Short answer: R&D and ICU4X both use RD, civil days are midnight-based (matching RD), JD is for astronomy only, and the RD↔JD bridge already exists in `Moment.jdOffset`.
 
-## Critical gotchas — memorize these
+**`Docs-Foundation/FractionalRataDiePlan.md`** is the actionable implementation plan for the sub-day adapter. Phased (A–F), ~1 working day total. Start there when it's time to actually write the code.
 
-### 1. ICU4X Julian epoch off-by-one
+### Key architectural decisions locked in this session
 
-Our `JulianArithmetic.fixedFromJulian(622, 7, 16) = 227015`.
-ICU4X's `fixed_from_julian(622, 7, 16) = 227016`.
+These are load-bearing and should not be re-litigated without a
+concrete reason:
 
-**Ours matches Foundation/ICU4C and the official Saudi UQ calendar.** When copying ICU4X's packed tables, **offset bits need regeneration** against Foundation or our own epoch. Month-length bits are epoch-independent and copy cleanly.
+1. **icu4swift aligns to Foundation's Date/Calendar API model, not
+   ICU's ucal state machine.** Foundation exposes high-level
+   queries (`range`, `ordinality`, `dateInterval`, `nextDate`,
+   `enumerateDates`, weekend queries) on immutable value-type
+   dates. It does NOT expose `ucal_set(field,value)` / `add` /
+   `roll` with eager cross-field recalculation. We don't port
+   that contract. **Canonical home: `04-icu4swiftGrowthPlan.md`
+   § "The guiding design principle".** Cross-referenced from
+   `00-Overview.md` § Scope, `02-ICUSurfaceToReplace.md`,
+   `03-CoverageAndSemanticsGap.md`, `BENCHMARK_RESULTS.md`,
+   `PITCH.md` Beat 3.
 
-### 2. Test discipline
+2. **Stage 1 surface is 10 primitives + state + adapter, NOT
+   ~41 public methods.** Foundation's public `Calendar` API has
+   ~41 methods + `RecurrenceRule`, but only ~10 are protocol
+   primitives on `_CalendarProtocol`. Everything else is
+   implemented generically in `swift-foundation` above the
+   protocol and comes along for free. This meaningfully
+   reduces the scope of Stage 1 work. Tiered breakdown in
+   `04-icu4swiftGrowthPlan.md` § "What needs to be added in
+   Stage 1" and `03-CoverageAndSemanticsGap.md` § "Capability
+   gap".
 
-- **Always `swift test -c release`**. Debug mode makes Moshier 50× slower → tests can hang for 160+ minutes.
-- **Never run tests in a loop hoping for different results.** Read the code. An infinite loop in `fromRataDie` cost an entire session.
-- **Kill stuck swift processes** before retrying: `ps aux | grep swift`, kill stragglers before a new invocation.
-- **Narrow filters**: `--filter "uqRegression"` instead of `--filter "Umm"`.
+3. **Sub-day precision: match `_CalendarGregorian`'s pattern
+   exactly.** The adapter splits `Date` into `(Int rataDie,
+   Double fractionalDay)` — identical shape to
+   `_CalendarGregorian`'s `julianDate: Double` +
+   `julianDay() -> Int` in `swift-foundation`. No new named
+   type. An earlier proposal for a custom `CivilInstant`
+   (Int64 rataDie + Int64 nsInDay) was reconsidered because
+   (a) Foundation's Double pattern doesn't actually accumulate
+   drift (each op re-converts from Date), and (b) matching
+   Foundation's existing shape lowers review friction. The
+   decision history is preserved in `MigrationIssues.md` § 2
+   and `04-icu4swiftGrowthPlan.md` Tier 3 under "Why we're
+   matching Foundation's pattern rather than inventing our own."
 
-### 3. Kshaya tithi in Hindu lunisolar
+4. **TimeZone scope: we do not port TZ internals.** Foundation's
+   existing `TimeZone` (TZif parsing, historical transitions)
+   is consumed unchanged. The port only touches
+   `(Date, TimeZone) → (Int rataDie, Double fractionalDay)` at
+   the adapter boundary. Captured in `TIMEZONE_CONSIDERATION.md`.
 
-Round-trip tests for Amanta/Purnimanta can't assert `back == rd` — kshaya tithis cause two consecutive RDs to map to the same Hindu date. Use `back == rd || back == rd - 1` (see `HinduBenchmarks.swift`'s `allowKshaya: true`).
+5. **Benchmark discipline: never `#expect` inside timed loops.**
+   Swift Testing's `#expect` macro costs ~1.5 µs/call even on
+   the success path. For microbenchmarks this dominates every
+   measurement. Rule documented in `CLAUDE.md` (with scope: perf
+   benchmarks only — normal correctness tests are fine), in
+   feedback memory, and in `Docs-Foundation/05-PerformanceParityGate.md`.
 
-### 4. Foundation bridging cost
+### Docs-Foundation/ file inventory (created this session)
 
-`Foundation.Calendar.dateComponents` in a 73k-iteration loop takes minutes due to Swift→ObjC→ICU bridging. For arithmetic calendars, use sparse samples (first-of-month + year boundaries, ~3k points) instead of daily coverage.
+Tracking:
+- `MASTER.md` — doc index
+- `STATUS.md` — snapshot (updated frequently)
+- `NEXT.md` — single next task (updated only at session end)
+- `PIPELINE.md` — backlog (updated freely during session)
+- `OPEN_ISSUES.md` — project risk register
+- `PITCH.md` — 3–5 min pitch plan for swift-foundation maintainers
+- `BENCHMARK_RESULTS.md` — all perf measurements, three-way table
 
-### 5. Meiji start date
+Design & reference:
+- `00-Overview.md` — mission, destination, scope, acceptance
+- `01-FoundationCalendarSurface.md` — `_CalendarProtocol`, dispatch
+- `02-ICUSurfaceToReplace.md` — 17 `ucal_*` functions + why
+- `03-CoverageAndSemanticsGap.md` — identifier + capability gap
+- `04-icu4swiftGrowthPlan.md` — Stage 1 plan + guiding principle
+- `05-PerformanceParityGate.md` — per-PR/per-port/per-release gate spec
+- `06-FoundationPortPlan.md` — Stages 2–4 rollout
+- `07-OpenQuestions.md` — stakeholder decision items
+- `MigrationIssues.md` — mutability + precision clarifications
+- `TIMEZONE_CONSIDERATION.md` — TZ scope
+- `PROJECT_PLAN.md` — overall stage roadmap
 
-ICU4C/Foundation places Meiji at **1868-09-08** (lunisolar Meiji 1/1/1). ICU4X and icu4swift use **1868-10-23** (proclamation). Both fall back to `ce` before 1873 (Meiji 6), where the Gregorian calendar was officially adopted. No practical impact.
+### icu4swift source changes this session
 
-## File layout
+- `Sources/CalendarComplex/HebrewArithmetic.swift` — major refactor: `YearData` struct, integer arithmetic, `@inlinable`. Hebrew 2.9 µs → 96 ns.
+- `Sources/CalendarComplex/Persian.swift` — binary search on `nonLeapCorrection`, `@inlinable`. Small improvement.
+- `Sources/CalendarComplex/CopticArithmetic.swift` — integer arithmetic, single-year compute, `@inlinable`.
+- `Sources/CalendarComplex/Coptic.swift` — `@inlinable`.
+- `Sources/CalendarComplex/Ethiopian.swift` — `EthiopianDateInner` promoted `@usableFromInline`.
+- **`Sources/CalendarComplex/EthiopianAmeteAlem.swift` (new)** — sibling struct, `mundi` era, `calendarIdentifier = "ethiopic-amete-alem"`.
+- `Sources/CalendarAstronomical/ChineseCalendar.swift` — added `Vietnam: EastAsianVariant` (UTC+7) and `typealias Vietnamese = ChineseCalendar<Vietnam>`.
+- **`Sources/CalendarAstronomical/IslamicAstronomical.swift` (new)** — delegating wrapper over `IslamicUmmAlQura`. `calendarIdentifier = "islamic"`.
+- `Sources/CalendarCore/Date.swift` — `@inlinable` on hot-path methods (`fromRataDie`, `init`, `rataDie`).
+- All 5 bench files refactored to no-`#expect` pattern:
+  `CalendarBenchmarks.swift`, `ComplexCalendarBenchmarks.swift`,
+  `JapaneseBenchmarks.swift`, `AstronomicalBenchmarks.swift`,
+  `HinduBenchmarks.swift`.
+- New regression tests: `EthiopianAmeteAlemTests.swift` (8 tests, all passing) and `VietnameseTests.swift` (6 tests, all passing).
 
-```
-Sources/
-  CalendarCore/        — CalendarProtocol, Date<C>, RataDie, Month, YearInfo
-  CalendarSimple/      — ISO/Gregorian/Julian/Buddhist/ROC + arithmetic helpers
-  CalendarComplex/     — Hebrew/Coptic/Ethiopian/Persian/Indian + arithmetic helpers
-  CalendarJapanese/    — Japanese with JapaneseEraData (extensible era table)
-  AstronomicalEngine/  — Moshier/Reingold/HybridEngine, Moment, Location
-  CalendarAstronomical/
-    ChineseCalendar.swift       — Chinese + Dangi via ChineseCalendar<V>
-    PackedChineseYear.swift     — 199-entry baked HKO table
-    IslamicTabular.swift        — Tabular + Civil + TabularEpoch
-    IslamicUmmAlQura.swift      — UQ with 301-entry KACST table
-  CalendarHindu/
-    HinduSolar.swift             — solar variants (Tamil/Bengali/Odia/Malayalam)
-    HinduLunisolar.swift         — lunisolar (Amanta/Purnimanta)
-    PackedHinduSolarYear.swift   — 4×150-entry baked tables
-    Ayanamsa.swift
-  DateArithmetic/      — DateDuration, add/until/balance (Temporal spec)
+### New scripts (for three-way perf comparison)
 
-Tests/
-  {module}Tests/
-  CalendarBenchmarks.swift      — per-calendar µs/date baselines
-  ComplexCalendarBenchmarks.swift
-  AstronomicalBenchmarks.swift
-  HinduBenchmarks.swift         — allowKshaya: true for lunisolar
-  JapaneseBenchmarks.swift
-  FullRegressionTests.swift     — Hindu 55k lunisolar + 4×1,811 solar
+- `Scripts/FoundationCalBench.swift` — standalone Swift benchmark against Foundation's public `Calendar` API.
+- `Scripts/FoundationChineseBench.swift` — Chinese-specific variant with tunable range.
+- `Scripts/ICU4CCalBench.c` — standalone C benchmark against ICU4C's `ucal_*` API directly. Compile with Homebrew ICU:
+  ```
+  cc -O2 -o /tmp/icubench Scripts/ICU4CCalBench.c \
+     -I/usr/local/opt/icu4c@78/include \
+     -L/usr/local/opt/icu4c@78/lib \
+     -Wl,-rpath,/usr/local/opt/icu4c@78/lib \
+     -licui18n -licuuc
+  ```
+- `Scripts/ICU4CMinimalBench.c` — diagnostic: `ucal_setMillis`-only, confirms setMillis is ~6 ns (the expense lives in get/set/clear).
 
-Docs/
-  TestCoverageAndDocs.md        — master per-calendar regression index
-  PERFORMANCE.md                — benchmark baseline, library size, table overhead
-  BakedDataStrategy.md          — current-state doc for baked data architecture
-  NEXT.md                       — roadmap (DateFormat deferred)
-  STATUS.md                     — phase-level status
-  HANDOFF.md                    — this doc
-  Chinese.md, Chinese_reference.md
-  Islamic.md, Islamic_reference.md
-  Hebrew.md, Hebrew_reference.md
-  Persian.md, Persian_reference.md
-  Dangi.md, CalendarJapanese.md, HinduCalendars.md
-  AstronomicalEngine.md, CalendarAstronomical.md, DateArithmetic.md
-```
+### New docs in `Docs/` (not `Docs-Foundation/`)
 
-## Deferred work
+- `Docs/ISLAMIC_ASTRONOMICAL.md` — design note for
+  `IslamicAstronomical` alias decision. Explains ICU4X deprecation
+  of `AstronomicalSimulation` in favour of UmmAlQura; we followed
+  that direction.
+- `Docs/TestCoverageAndDocs.md` — updated with three new rows
+  (Islamic astronomical, Ethiopian Amete Alem, Vietnamese).
+- `Docs/HANDOFF.md` — this file.
 
-| Item | Why | Where it'd go |
-|---|---|---|
-| Dangi baked data | KASI data less accessible than HKO; rare boundary differences vs Chinese | Same format as Chinese, separate table |
-| Hindu lunisolar baking | Complex adhika masa / kshaya tithi structure; profile first | Would need new packing scheme |
-| Phase 8 DateFormat | Calendar work priority | Per `Docs/Swift_Implementation_Plan.md` |
-| Chinese pre-1901 | HKO data doesn't extend back | Would need Qing-era recompute |
+Also: most other `Docs/` files (HANDOFF, NEXT, STATUS, PERFORMANCE, PROJECT, BakedDataStrategy, HinduCalendars) got ⚠ notes flagging that their old µs-scale numbers were `#expect`-inflated and pointing at `Docs-Foundation/BENCHMARK_RESULTS.md` for the clean numbers.
 
-## User preferences (from accumulated feedback)
+## Session-continuity checklist
 
-- **`swift test -c release` always** — debug mode is 50× slower.
-- **Terse responses**, no emojis in code, no emojis in messages unless asked.
-- **Don't create docs unless asked** — user may request cleanup.
-- **Keep `Docs/TestCoverageAndDocs.md` in sync** when tests/docs change.
-- **Read code before retrying failing tests.** Kill stuck builds first.
-- **Verify before recommending.** Check that functions/files still exist (memory can be stale).
-- **Phase 8 (DateFormat) is deferred** — calendar/perf work continues.
-
-## Session continuity checklist
-
-When resuming:
+When resuming after context reset:
 
 1. Read `Docs/HANDOFF.md` (this file).
-2. Read `Docs/TestCoverageAndDocs.md` for regression status.
-3. Read `Docs/PERFORMANCE.md` for benchmark baseline.
-4. Glance at `MEMORY.md` index in the memory system.
-5. Run `swift test -c release 2>&1 | tail -3` to confirm state (should show 321 tests, 1 known failure).
-6. Then ask the user what to work on.
+2. Read `Docs-Foundation/MASTER.md` — doc index for the port work.
+3. Read `Docs-Foundation/STATUS.md` — current state.
+4. Read `Docs-Foundation/NEXT.md` — one focused next task.
+5. Read `Docs-Foundation/PIPELINE.md` — backlog.
+6. If confused about why something was decided a certain way,
+   check `Docs-Foundation/OPEN_ISSUES.md` and
+   `Docs-Foundation/MigrationIssues.md`.
+7. Pitch-delivery thread is `Docs-Foundation/PITCH.md`; read it
+   if user signals they're about to pitch.
 
-## Next obvious work (not committed to, just possibilities)
+## Gotchas / things easy to forget
 
-- **Dangi baked data** — biggest calendar gap. Need KASI-sourced data or recompute via Moshier.
-- **Hindu lunisolar profiling + baking** — 3,900 µs/date is the slowest calendar by far.
-- **Phase 8 DateFormat** — when user signals calendar work is "done enough."
-- **Chinese pre-1901 / post-2099 improvements** — if needed for historical research use cases.
+- **Always `swift test -c release`.** Debug Moshier is 50× slower.
+- **Never `#expect` inside a timed loop** in perf tests
+  (correctness tests are fine). Documented in `CLAUDE.md`.
+- **Kill stuck swift processes** before retrying: `ps aux | grep swift`.
+- **`swift-foundation-icu` has a private `hinducal.{cpp,h}` fork** that isn't in upstream ICU4C — Apple-added to support the Hindu identifiers. We don't need to match its internals; we have our own Moshier-based Hindu math.
+- **ICU4X deprecated observational Islamic in favour of UmmAlQura.** We follow that lead. `IslamicAstronomical` is a delegating alias; divergence testing against Foundation's own `.islamic` is deferred (PIPELINE item 19).
+- **Our Julian epoch = 227015**, ICU4X's = 227016. Ours matches Foundation/ICU4C.
+- **Test build quirk:** `swift test -c release --filter X` can fail with "module 'CalendarSimple' was not compiled for testing" if a previous non-filtered build is stale. Fix: `rm -rf .build && swift test -c release --filter X`. Pre-existing issue; not from any of our changes.
+- **Hindu lunisolar (Amanta, Purnimanta) is the one slow tier** at ~3.3 ms/date. Documented in `icu4swift/Docs/BakedDataStrategy.md` with a deferred baking proposal (PIPELINE item 11).
+- **Chinese 1906 cluster:** 3 failures in the regression test, pre-existing, documented in `Docs/Chinese_reference.md`. Not something to "fix" — it's an ICU-vs-HKO physical disagreement.
 
-Otherwise the project is in excellent shape — all 23 calendars validated, performance optimized where it matters, documentation comprehensive.
+## Current pipeline highlights
+
+Top items in `Docs-Foundation/PIPELINE.md` that are independent
+(can be done whenever):
+
+- **Item 1** — deliver the pitch (all prep material is ready)
+- **Item 9** — start Stage 1 code in icu4swift (needs `04-icu4swiftGrowthPlan.md` review first)
+- **Item 10** — implement Stage 0 benchmark harness in swift-foundation
+- **Item 11** — Hindu lunisolar baking (~8 KB per calendar, ~1000× speedup)
+- **Item 18(a)** — ±10,000-year round-trip stability test (1 hour; cheap talking point)
+- **Item 19** — Islamic astronomical divergence test vs Foundation's `.islamic`
+
+`NEXT.md` at time of handoff points at Pipeline item 17 — but
+that item already landed this session. The next session should
+re-read `NEXT.md` and likely update it, or pick freely from
+Pipeline.
+
+## Where the session ended
+
+Last user interaction: approved reverting the `CivilInstant`
+decision in favour of matching `_CalendarGregorian`'s Double
+`julianDate` pattern. All three affected docs updated; source
+file deleted; build clean. Context was saturated; user asked for
+handoff + reset.

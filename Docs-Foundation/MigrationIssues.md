@@ -115,52 +115,67 @@ absolute Date + timeZone
     │
     ▼ (add tz offset; split)
 ┌─────────────────┐   ┌──────────────────────────────┐
-│ RataDie (day)   │   │ nanosecondsInDay (Int64)     │
-│ Int64           │   │ 0 ..< 86_400_000_000_000     │
+│ rataDie (Int)   │   │ fractionalDay (Double)       │
+│ whole day       │   │ 0.0 ..< 1.0 (time-of-day)    │
 └─────────────────┘   └──────────────────────────────┘
     │                          │
-    ▼ calendar math             ▼ integer arithmetic
+    ▼ calendar math             ▼ Double arithmetic
 Y, M, D, era, week, …     hour, minute, second, nanosecond
 ```
 
-The two pieces together form a single boundary value:
+icu4swift's RataDie-first model **is** this pattern. What we need
+to add is the adapter that:
+
+1. Takes `(Date, TimeZone)` → `(Int rataDie, Double fractionalDay)`.
+2. Hands `rataDie` to the calendar for Y/M/D/era/week fields.
+3. Extracts hour / minute / second / nanosecond from
+   `fractionalDay` via trivial Double arithmetic.
+4. Handles DST transitions (where a civil day is not 86400 s long)
+   inside the `(Date, TimeZone) → (rataDie, fractionalDay)` boundary
+   — the calendar itself never sees DST.
+
+### Alignment with Foundation's existing pattern
+
+This is the **same pattern** Foundation's `_CalendarGregorian`
+already uses (see `Calendar_Gregorian.swift`):
 
 ```swift
-public struct CivilInstant: Sendable, Equatable, Comparable {
-    public let rataDie: RataDie          // Int64 day count
-    public let nanosecondsInDay: Int64   // 0 ..< 86_400_000_000_000
+var julianDate: Double {
+    timeIntervalSinceReferenceDate / 86400 + julianDayAtDateReference
+}
+func julianDay() throws -> Int {
+    let jd = (julianDate + 0.5).rounded(.down)
+    // ...
 }
 ```
 
-icu4swift's RataDie-first model **is** this pattern. What we need to
-add is the adapter that:
+Foundation splits `Date` into a Double `julianDate`, rounds to an
+Int `julianDay` for calendar math, and handles time-of-day from the
+fractional part. We match this shape exactly — same Int day + Double
+time-of-day split, same precision characteristics, same integer
+arithmetic for Y/M/D and same Double arithmetic for sub-day fields.
 
-1. Takes `(Date, TimeZone)` → `CivilInstant`.
-2. Hands `CivilInstant.rataDie` to the calendar for Y/M/D/era/week fields.
-3. Decomposes `CivilInstant.nanosecondsInDay` into hour / minute / second
-   / nanosecond via integer arithmetic.
-4. Handles DST transitions (where a civil day is not 86400 s long)
-   inside the `(Date, TimeZone) ↔ CivilInstant` boundary — the calendar
-   itself never sees DST.
+**Why we're matching Foundation's pattern rather than inventing our
+own.** Earlier drafts of this document proposed a custom
+`CivilInstant` type (Int64 rataDie + Int64 nanosecondsInDay) for
+drift-free integer arithmetic. That design was reconsidered because:
 
-The adapter is small, well-understood, and already implemented in
-Foundation for Gregorian.
+- **Foundation's Double pattern does not actually accumulate drift
+  in practice.** `_CalendarGregorian` re-converts from `Date` on
+  every operation — there's no long-lived Double accumulator where
+  drift could build up.
+- **Matching Foundation's shape lowers review friction.** "We do it
+  the same way `_CalendarGregorian` does it" is a shorter sell than
+  "here's a different representation we think is better."
+- **Precision at the boundary is bounded by `Date` anyway.** `Date`
+  is Double; no alternative representation can add precision we
+  don't receive from `Date` on input.
 
-### Why `CivilInstant` uses Int64 nanoseconds, not Double fractional RataDie
-
-The subtlety: you cannot use the existing `Moment` type (Double
-fractional RataDie, from `AstronomicalEngine`) as the boundary
-representation. For 2024-era dates, a Double fractional RataDie has
-only about 10 decimal digits of fractional precision, which works out
-to ~8 µs at the day scale — **worse than Foundation's own
-`Date.timeIntervalSinceReferenceDate`**, which is ~100 ns at the same
-era. `Moment` is the right type for astronomy (where Moshier spans
-geological timescales at micro-arcsecond angular precision over
-millennia) but is the wrong type for Foundation bridging.
-
-`CivilInstant`, using explicit `Int64` nanoseconds-in-day, is exact at
-nanosecond precision at every date — strictly better than, and
-perfectly round-trippable against, Foundation's `Date`.
+`Moment` (Double fractional Julian Day, ~8 µs precision at 2024)
+stays in `AstronomicalEngine` for astronomy, where geological-scale
+time ranges and sub-arcsecond angular precision demand that
+representation. It's not used for the Foundation boundary, but
+conceptually it's a close cousin to Foundation's `julianDate`.
 
 ### Sub-second precision where calendar math actually needs it
 
@@ -168,17 +183,26 @@ perfectly round-trippable against, Foundation's `Date`.
 Day in Double, for Moshier new-moon and solar-longitude calculations
 that drive the Chinese, Hindu, Islamic-astronomical, and Persian
 calendars. The *output* of those calculations is a civil RataDie
-(the day containing the sunrise after the new moon). `Moment` and
-`CivilInstant` serve different purposes and do not interact.
+(the day containing the sunrise after the new moon). `Moment` does
+not participate in the Foundation boundary — the adapter uses its
+own `(Int rataDie, Double fractionalDay)` split matching
+`_CalendarGregorian`.
 
 ### Precision summary
 
-| Type | Precision at 2024 | Use |
-|---|---|---|
-| Foundation `Date` | ~100 ns | public API boundary |
-| **`CivilInstant` (proposed)** | **exact 1 ns** | **icu4swift ↔ Foundation boundary** |
-| `RataDie` (existing) | 1 day (whole) | calendar math core |
-| `Moment` (existing) | ~8 µs | astronomical engine internals |
+| Type | Representation | Precision at 2024 | Use |
+|---|---|---|---|
+| Foundation `Date` | `Double` seconds since ref | ~100 ns | public API boundary |
+| Foundation `_CalendarGregorian` internal | `Double julianDate` | ~86 ns (matches Date) | today's Swift-native Gregorian path |
+| icu4swift Foundation adapter (planned) | Same as above — `(Int rataDie, Double fractionalDay)` | matches `_CalendarGregorian` | our new Stage 1 adapter layer |
+| `Moment` (existing) | `Double` fractional RataDie | ~8 µs | astronomy internals only |
+| `RataDie` (existing) | `Int64` day count | 1 day (whole) | calendar math core |
+
+At the boundary with Foundation's `Date`, all representations top
+out at `Date`'s own ~100 ns Double precision — nothing can invent
+bits beyond that. We match `_CalendarGregorian`'s representation
+so that our adapter and Foundation's existing Gregorian path look
+and behave identically.
 
 ---
 
@@ -187,9 +211,9 @@ calendars. The *output* of those calculations is a civil RataDie
 | Concern | Answer |
 |---|---|
 | Foundation mutability | Maps onto value types with stored properties. Zero friction. Removes a lock compared to `_CalendarICU`. |
-| ICU millisecond basis | Foundation does not expose it. An adapter translates `Date ↔ CivilInstant` at the boundary. |
-| Sub-day time math | Handled by the adapter as integer-nanosecond arithmetic inside `CivilInstant`, never by the calendar backend. |
-| Sub-day precision | **Exact nanosecond**, via `CivilInstant`'s `Int64 nanosecondsInDay` — strictly better than Foundation's own `Date` (~100 ns at 2024). |
+| ICU millisecond basis | Foundation does not expose it. An adapter splits `Date` into `(Int rataDie, Double fractionalDay)`, matching `_CalendarGregorian`'s existing pattern. |
+| Sub-day time math | Handled by the adapter on `fractionalDay` (Double), same as `_CalendarGregorian`. The calendar backend never sees time-of-day. |
+| Sub-day precision | Matches Foundation's Date precision (~100 ns at 2024). We match `_CalendarGregorian`'s representation exactly so the adapter and Foundation's existing Gregorian path look identical. |
 
 ### Implication for the plan
 
@@ -199,9 +223,11 @@ Stage 1 of the port (see `00-Overview.md`) is:
 - Stored properties on each calendar struct for the Foundation-level
   knobs (`timeZone`, `firstWeekday`, `minimumDaysInFirstWeek`,
   `locale`, `gregorianStartDate`).
-- A new `CivilInstant` boundary type in `CalendarCore` (`(RataDie,
-  Int64 nanosecondsInDay)`) and an adapter layer that maps
-  `(Date, TimeZone) ↔ CivilInstant` losslessly.
+- An adapter layer that splits `Date` into `(Int rataDie, Double
+  fractionalDay)` — the same representation
+  `_CalendarGregorian` already uses in `Calendar_Gregorian.swift`.
+  No new named type is needed; the adapter is a pair of free
+  functions.
 - The additional API surface Foundation expects on top of that
   (`range`, `ordinality`, `dateInterval`, `nextDate(after:matching:)`,
   etc.) — which is orthogonal to the mutability/millisecond questions

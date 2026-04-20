@@ -139,40 +139,36 @@ no state today; adding them is mechanical.
 
 ### Tier 3 — Adapter infrastructure shared across all backends
 
-- **`CivilInstant` boundary type (new).** Lives in `CalendarCore`.
-  Defined as:
+- **TZ adapter aligned with `_CalendarGregorian`'s pattern.**
+  Foundation's Swift-native `_CalendarGregorian` already splits a
+  `Date` into `(Int julianDay, Double fractionalDay)` via
+  `Date.julianDate` — and has shipped this way for years. We match
+  that representation exactly. No new named type is needed: the
+  adapter is a pair of free functions that:
 
-  ```swift
-  public struct CivilInstant: Sendable, Equatable, Comparable {
-      public let rataDie: RataDie          // Int64 day count
-      public let nanosecondsInDay: Int64   // 0 ..< 86_400_000_000_000
-  }
-  ```
+  1. Consume `(Foundation.Date, TimeZone)` and produce
+     `(Int rataDie, Double fractionalDay)`.
+  2. Reverse. DST gap / fall-back handling lives in the
+     conversion; the calendar core never sees DST.
 
-  Represents a point in time at exact nanosecond precision — strictly
-  better than Foundation's `Date.timeIntervalSinceReferenceDate`
-  (~100 ns at 2024 era) — and round-trippable without loss. This is
-  **not** the existing `Moment` type from `AstronomicalEngine`:
-  `Moment` is Double fractional RataDie and has only ~8 µs precision
-  at the same era, which would be a step backward at the Foundation
-  boundary. `Moment` continues to serve astronomy; `CivilInstant` serves
-  Foundation bridging. See `MigrationIssues.md` § 2 for the full
-  precision analysis.
+  Reference: `Calendar_Gregorian.swift` in `swift-foundation`
+  (`var julianDate: Double`, `func julianDay() -> Int`). We ported
+  the same shape. Earlier drafts of this document proposed a
+  custom `CivilInstant` type; that design was reconsidered because
+  (a) Foundation's Double pattern doesn't actually accumulate drift
+  in practice — each operation re-converts from `Date`, so there
+  is no long-lived accumulator — and (b) matching Foundation's
+  existing shape lowers review friction. See `MigrationIssues.md`
+  § 2 for the full rationale.
 
-- **TZ adapter** — `(Date, TimeZone) ↔ CivilInstant`. Integer-math
-  conversion: subtract reference / timezone offsets, split into
-  whole-day `RataDie` + nanosecond-within-day. DST gap / fall-back
-  handling lives here; the calendar core never sees DST. See
-  `TIMEZONE_CONSIDERATION.md` for the scope.
-
-- **Sparse DateComponents bridging** — Foundation's `DateComponents`
-  is a sparse struct (any subset of fields may be set or read). The
-  compose / decompose / difference primitives in Tier 1 all consume
-  or produce it. Missing-field semantics, over-specified field
-  combinations, and validity rules all live in this shared layer.
-  `CivilInstant.nanosecondsInDay` decomposes into H/M/S/ns via pure
-  integer arithmetic (`nsInDay / 3600_000_000_000` → hour, etc.);
-  no Double drift.
+- **Sparse DateComponents bridging.** Foundation's
+  `DateComponents` is a sparse struct (any subset of fields may
+  be set or read). The compose / decompose / difference primitives
+  in Tier 1 all consume or produce it. Missing-field semantics,
+  over-specified field combinations, and validity rules all live
+  in this shared layer. Hour / minute / second / nanosecond extract
+  from the Double `fractionalDay` via straightforward arithmetic,
+  matching the approach `_CalendarGregorian` uses today.
 
 ### What comes along for free (lives in swift-foundation above `_CalendarProtocol`)
 

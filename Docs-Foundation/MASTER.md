@@ -44,6 +44,8 @@ Written once per topic; updated only when the design changes.
 | **`06-FoundationPortPlan.md`** | **Stages 2–4 roadmap.** Plumbing (Stage 2) → calendar-by-calendar port in risk order (Stage 3) → removal of `_CalendarICU` (Stage 4). Per-phase canonical flow. |
 | **`07-OpenQuestions.md`** | Alignment items needing stakeholder decisions before we commit to specifics. Organised by strategic / performance / correctness / scope / process. Distinct from `OPEN_ISSUES.md` (which is the risk register). |
 | **`MigrationIssues.md`** | Design clarifications on two early concerns (Foundation mutability, RataDie vs. millisecond time basis) that turned out to be non-issues. Captures reasoning so it is not lost. |
+| **`SUBDAY_BOUNDARY.md`** | **Authoritative, closed decision**: how icu4swift carries sub-day time at the `Foundation.Date ↔ RataDie` boundary. Matches `_CalendarGregorian`'s pattern — a pair of adapter functions, no new named type. Lists what does NOT change in existing code (answer: nothing). Read this before touching anything sub-day-related, especially after a session reset. |
+| **`FractionalRataDiePlan.md`** | **Implementation plan** for the sub-day adapter. Phased build order (A–F), ~1 working day total, with per-phase exit criteria. Start here when actually coding the adapter. Cross-references `SUBDAY_BOUNDARY.md` for the design and `Docs/RDvsJD.md` for the midnight-based-RD rationale. |
 | **`TIMEZONE_CONSIDERATION.md`** | How the port handles TimeZone and DST — an anticipated concern from the `swift-foundation` team. Scope boundary (TZ data out, TZ-aware adapter in), DST follow-up Q&A. |
 
 ## Relationship to icu4swift's own docs

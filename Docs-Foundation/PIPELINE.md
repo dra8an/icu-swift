@@ -81,6 +81,25 @@ state, tests, measurement, docs.
   required for the simplest item.
 - **Unblocks:** Stage 1 momentum.
 
+### 9a — Build the sub-day Foundation adapter (fractional RataDie)
+Pair of free functions between `Foundation.Date` and
+`(RataDie, secondsInDay, nanosecond)` — matches `_CalendarGregorian`'s
+pattern. Full plan + phased build order in
+`FractionalRataDiePlan.md`. Six phases (A–F) totaling ~1 working day.
+No existing code changes; no calendar backends involved; independently
+testable. Benchable vs. Foundation directly — clean first data point
+for the "we match `_CalendarGregorian`'s shape but skip the noon-nudge"
+claim.
+
+- **Delivers:** working `Foundation.Date ↔ (RD, h, m, s, ns)` adapter
+  + benchmark vs. Foundation's path. First visible Stage 1 result.
+- **Effort:** ~1 working day.
+- **Dependencies:** design decisions are locked in `SUBDAY_BOUNDARY.md`
+  and `Docs/RDvsJD.md`. Ready to build.
+- **Unblocks:** every downstream Stage 1 primitive (`DateComponents`
+  decomposition, `Date<C>` convenience inits, `_CalendarProtocol`
+  conformance in Stage 2).
+
 ### 10 — Implement the Stage 0 benchmark harness in swift-foundation
 Build the actual harness described in `05-PerformanceParityGate.md`:
 - canonical baseline JSON format,
