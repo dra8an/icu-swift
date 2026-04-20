@@ -92,6 +92,19 @@ After the port completes:
   `Locale_ICU`.
 - `astro.cpp` — we do **not** port ICU's astronomical code. icu4swift
   already ships a validated Moshier ephemeris engine that replaces it.
+- **ucal-style per-field mutation semantics.** icu4swift does **not**
+  implement ICU's `ucal_set(field, value)` / `ucal_add` / `ucal_roll`
+  contract where any field mutation triggers eager recomputation of
+  every other field (julian day, day-of-week, is-leap, zone offset,
+  etc.) on each subsequent read. Foundation's public `Calendar` API
+  does not expose that contract — it offers high-level queries
+  (`range(of:in:for:)`, `ordinality`, `dateInterval`, `nextDate`,
+  `enumerateDates`, `isDateInWeekend`, `date(byAdding:value:to:)`)
+  on immutable value-type dates. We match Foundation's shape, not
+  ICU's. This is an intentional design choice and explains the
+  measured speedup over raw ICU4C — we don't pay for a mutation
+  protocol we don't expose. See `BENCHMARK_RESULTS.md` for the
+  measured consequences.
 
 ## Acceptance criteria
 

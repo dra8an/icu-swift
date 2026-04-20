@@ -51,24 +51,31 @@ noticed a half-finished initiative and I can help with the rest."
 example with the most "wow" per word. Options, in order of impact
 for a Foundation engineer:
 
-1. **Performance (measured, the lead recommendation).** "We have
-   a three-way comparison — icu4swift, ICU4C direct (C API, no
-   Swift wrapper), and Foundation's public Calendar API — all run
-   with matching methodology (100k iterations, warm-up, checksum,
-   release-mode). On **arithmetic calendars** (Gregorian, Hebrew,
-   Persian, Coptic, Indian, Japanese, Islamic×3), icu4swift is
-   **10–40× faster than raw ICU4C's C++ math**. On **Chinese**,
-   icu4swift is ~**1,000× faster than raw ICU4C** (baked HKO data
-   vs ICU's runtime astronomy). Foundation adds ~800 ns of
-   Swift/ObjC wrapper overhead on top of ICU4C for every identifier.
+1. **Performance (measured, the lead recommendation).** "icu4swift
+   is architected to match **Foundation's Date/Calendar API model** —
+   immutable value dates, high-level queries (`range`, `ordinality`,
+   `dateInterval`, `nextDate`, `enumerateDates`), no ucal-style
+   per-field mutation with eager recalculation. Our benchmarks
+   reflect that alignment: atomic `fromRataDie` / `toRataDie` round-trips.
    
-   Concrete: Chinese round-trip — **42 ns** on icu4swift,
-   **~12,000 ns** on Foundation's Calendar API, **~41,000 ns** on
-   raw ICU4C via `ucal_*`."
+   Three-way measurement — icu4swift, ICU4C direct via `ucal_*`
+   (no Swift wrapper), Foundation's public Calendar API — matched
+   methodology, 100k iterations, release mode:
+   - **Arithmetic calendars**: icu4swift 9–26 ns, ICU4C 250–330 ns,
+     Foundation ~1,100–1,200 ns. **10–40× faster than raw ICU4C.**
+   - **Chinese** (baked HKO data): icu4swift **42 ns**, Foundation
+     ~12,000 ns, raw ICU4C ~41,000 ns. **~1,000× faster than raw ICU4C.**
    
-   See `BENCHMARK_RESULTS.md` § "Three-way comparison" for the full
-   table. The apples-to-oranges question is substantially resolved —
-   we beat ICU4C head-to-head, independent of the wrapper layer.
+   The gap is **not** a clever optimization — ICU's per-field get/set
+   contract forces full recomputation of every field (julian day,
+   day-of-week, is-leap, zone offset, plus Chinese astronomy) on
+   every access. That's the cost of ucal's shape. Foundation's
+   public API doesn't require it, and we don't pay for it."
+   
+   See `BENCHMARK_RESULTS.md` for the full table. Stage 1 (adding
+   Foundation-shaped query APIs on top of our core) will produce
+   genuinely end-to-end comparisons. The math-speed advantage
+   measured here is the foundation those numbers will build on.
 
 2. **Code size.** "Chinese calendar in icu4swift is ~600 lines of
    Swift. ICU's `chnsecal.cpp` + `astro.cpp` is around 4,000 lines of

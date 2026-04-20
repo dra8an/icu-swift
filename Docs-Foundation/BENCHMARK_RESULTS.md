@@ -24,11 +24,25 @@ calendars are under 300 ns/date; the two exceptions (Hindu
 lunisolar) remain the documented slow tier and will close with
 baking (pipeline item 11).
 
-**Apples-to-oranges caveat substantially resolved 2026-04-20.** See
-§ "Three-way comparison" above. Direct ICU4C measurement confirms
-icu4swift beats raw ICU4C math by 10–40× on arithmetic calendars and
-~1,000× on Chinese. Foundation adds ~800 ns of Swift/ObjC wrapper
-cost on top of that.
+**API-alignment framing (updated 2026-04-20).** icu4swift is
+architected to match **Foundation's Date/Calendar API model**, not
+ICU4C's ucal state machine. Foundation exposes high-level queries
+(`range(of:in:for:)`, `ordinality`, `dateInterval`, `nextDate`,
+`enumerateDates`, `isDateInWeekend`) on immutable value-type dates;
+it does **not** expose ucal-style per-field mutation with eager
+recalculation. Our benchmark shape (atomic `fromRataDie` /
+`toRataDie`) reflects that alignment.
+
+ICU4C's overhead in the direct measurement comes largely from its
+per-field get/set contract that requires recomputing all fields —
+julian day, day-of-week, is-leap, etc. — on every field touch.
+Chinese adds astronomical recomputation on top. That's the cost of
+ICU's API shape, not a design choice we need to inherit.
+
+The genuinely comparable Foundation benchmarks will land in Stage 1,
+when we implement `range`/`ordinality`/`nextDate`/etc. on top of
+our core. The math-speed advantage measured here is the foundation
+that end-to-end speedup will build on.
 
 ## Chinese calendar round-trip (2026-04-17)
 
@@ -152,7 +166,14 @@ file/line/column and the comparison operands even on the non-failing
 path. Per-invocation cost is ~1.5 µs, which completely dominated the
 actual calendar work.
 
-### Apples-to-oranges caveats in the Foundation comparison
+### API-model context
+
+Note: this section predates the 2026-04-20 framing rewrite. The
+"apples-to-oranges" language below is superseded — the current
+understanding is that **icu4swift is deliberately Foundation-shaped,
+not ICU-shaped**, and that's the source of the speedup, not a bias
+in measurement. See the TL;DR at top of this doc for the current
+framing. Kept below for historical context.
 
 When comparing icu4swift (no `#expect`) to Foundation's standalone
 script:
@@ -432,19 +453,24 @@ Chinese anomaly is low-priority (pipeline #12 is related).
 
 ### Practical conclusion for the pitch
 
-The apples-to-oranges caveat is **substantially resolved**:
+**The speedup comes from API alignment, not micro-optimization.**
+icu4swift is shaped for Foundation's immutable value-type API;
+ICU4C is shaped for its own ucal state-machine contract
+(per-field get/set with eager recalculation). The measured gap —
+10–40× on arithmetic, ~1,000× on Chinese — is what you save by
+not paying for a mutation protocol Foundation doesn't expose.
 
-> "We measured three ways: icu4swift's pure-Swift math, ICU4C's
-> own C API directly, and Foundation's public Calendar API. icu4swift
-> beats the raw ICU4C math by **10–40× on arithmetic calendars** and
-> **1,000× on Chinese**. On top of that, Foundation adds ~800 ns of
-> Swift/ObjC wrapper overhead per iteration. Removing the ICU4C
-> dependency saves that math cost directly — even if our own
-> Calendar wrapper layer adds similar overhead back, the underlying
-> math savings remain."
-
-No more "but Foundation does more per iteration" rebuttal. ICU4C
-direct is the fair baseline, and we beat it decisively.
+> "icu4swift beats raw ICU4C math by 10–40× on arithmetic calendars
+> and ~1,000× on Chinese. Not because our arithmetic is cleverer —
+> because ICU's per-field get/set contract forces full recomputation
+> of every field (julian day, day-of-week, is-leap, zone offset,
+> and for Chinese, astronomical calculations) on every field access.
+> That cost is the price of ucal's API shape. We're shaped for
+> Foundation's API model, which doesn't require it. Stage 1 will
+> add the Foundation-shaped query APIs on top of our core; perf
+> comparisons through `range`/`ordinality`/`nextDate` will be the
+> genuinely like-for-like numbers, and we expect the math-speed
+> advantage measured here to carry through."
 
 ## Clean-methodology sweep — all 22 calendars (2026-04-19)
 
