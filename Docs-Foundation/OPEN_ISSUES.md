@@ -211,8 +211,13 @@ shippable. The port is atomic at the library level.
 
 **What would resolve it.**
 - `ethiopicAmeteAlem`: epoch offset from existing Ethiopian. Trivial.
-- `islamic` (astronomical): adapt our `IslamicCivil` with a lunar
-  visibility criterion — medium effort.
+- `islamic` (astronomical): **resolved 2026-04-20 via alias** —
+  `IslamicAstronomical` now ships as a delegating wrapper over
+  `IslamicUmmAlQura`, matching ICU4X's direction (their
+  `AstronomicalSimulation` is deprecated in favor of UmmAlQura).
+  Full rationale in `Docs/ISLAMIC_ASTRONOMICAL.md`. Divergence
+  testing against Foundation's `.islamic` output is a deferred
+  pipeline item (see PIPELINE item 19).
 - `vietnamese`: Chinese-family calendar at UTC+7. Structure is
   identical to Chinese/Dangi; just a new `VietnamVariant`. Low effort.
 - Hindu regional lunisolar labels: need to confirm with Foundation's

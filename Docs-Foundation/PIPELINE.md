@@ -211,6 +211,39 @@ slower than Foundation's Chinese (~41 µs vs ~12 µs) — likely an
 ICU-version or Apple-specific-optimization difference. icu4swift
 wins both at 42 ns regardless.
 
+### 19 — Measure divergence of `IslamicAstronomical` vs Foundation's `.islamic`
+icu4swift's `IslamicAstronomical` ships as a delegating alias for
+`IslamicUmmAlQura` (see `Docs/ISLAMIC_ASTRONOMICAL.md` for the full
+design rationale). ICU4X made the same choice (their
+`AstronomicalSimulation` is deprecated in favor of UmmAlQura).
+ICU4C, which Foundation still uses, continues to use the Reingold
+observational algorithm. The two approaches agree within the
+UmmAlQura baked range (1300–1600 AH / ~1882–2174 CE) but can
+diverge outside it.
+
+Scope:
+- Daily conversion comparison for 1900–2100 CE (the common-usage
+  case) between our `IslamicAstronomical` and Foundation's
+  `Calendar(identifier: .islamic)`. Expected divergence: near zero.
+- Extend comparison to pre-1882 and post-2174 to quantify the
+  fallback-range gap. Expected divergence: non-zero, up to ±1–2 days
+  at month boundaries.
+- Decision tree based on results:
+  - Zero divergence → keep alias. Close this item.
+  - Small divergence inside baked range → investigate (KACST
+    source mismatch?).
+  - Large divergence outside baked range → decide whether to port
+    the Reingold observational algorithm from
+    `calendrical_calculations/src/islamic.rs`.
+
+- **Delivers:** confidence that our `.islamic` output matches
+  Foundation in the usage ranges that matter. Clears one of the
+  three "missing identifiers" from OPEN_ISSUES Issue 6.
+- **Effort:** half a day for the comparison test and analysis;
+  optionally 1–2 more days if porting Reingold is needed.
+- **Dependencies:** none.
+- **Unblocks:** identifier-coverage story in the pitch, Stage 3.
+
 ### 18 — Extreme-range regression testing for arithmetic calendars
 Today's Hebrew regression runs 73,414 days (1900–2100) against
 Hebcal with zero divergences. Since Hebrew (and the other arithmetic
@@ -288,7 +321,7 @@ A few natural constraints worth keeping in mind when rearranging:
 - **Items 3–8** (reference docs) have internal dependencies
   (5 → 6 → 7, 3 & 4 before 5).
 - **Items 9 and 10** (code work) should be preceded by item 6.
-- **Items 11, 12, 13, 15, 17, 18** are independent of the rest; fill
+- **Items 11, 12, 13, 15, 18, 19** are independent of the rest; fill
   time between blocked items.
 - **Item 17** removes the apples-to-oranges concern in the perf
   comparison — good to land before the pitch conversation happens.

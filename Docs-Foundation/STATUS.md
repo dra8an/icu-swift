@@ -62,7 +62,7 @@ flipped from ICU to Swift.
 | ethiopicAmeteAlem | — (missing variant) | — | — | — |
 | indian | ✓ | — | — | — |
 | hebrew | ✓ | — | — | — |
-| islamic | — (astronomical variant missing) | — | — | — |
+| islamic | ✓ (alias for IslamicUmmAlQura — see `Docs/ISLAMIC_ASTRONOMICAL.md`) | — | — | — |
 | islamicCivil | ✓ | — | — | — |
 | islamicTabular | ✓ | — | — | — |
 | islamicUmmAlQura | ✓ | — | — | — |
