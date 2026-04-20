@@ -60,71 +60,15 @@ hunts.
 - **Unblocks:** stronger pitch framing; reduces the scope of the
   arithmetic-calendar phase in Stage 3.
 
-### 3 — Write `01-FoundationCalendarSurface.md`
-Distill the swift-foundation exploration-agent report (2026-04-17)
-into durable form: `_CalendarProtocol`, the three existing backends,
-`CalendarCache` dispatch, the integration seam.
-
-- **Delivers:** reference doc that anchors every Stage 2/3
-  discussion.
-- **Effort:** half a day. Raw material already gathered.
-- **Dependencies:** none.
-- **Unblocks:** nothing critical; informational.
-
-### 4 — Write `02-ICUSurfaceToReplace.md`
-Distill the ICU4C exploration-agent report (2026-04-17): the 17
-`ucal_*` functions Foundation calls, the C++ classes behind each,
-what each semantic means for a Swift reimplementation.
-
-- **Delivers:** reference doc; "what must icu4swift match" spec.
-- **Effort:** half a day.
-- **Dependencies:** none.
-- **Unblocks:** nothing critical; informational.
-
-### 5 — Write `03-CoverageAndSemanticsGap.md`
-Consolidate the identifier map (Foundation × upstream ICU ×
-swift-foundation-icu fork × icu4swift) plus the capability gap
-table that icu4swift must close.
-
-- **Delivers:** single reference table so nothing is missed.
-- **Effort:** half a day. Raw material in `00-Overview.md` and
-  the two exploration reports.
-- **Dependencies:** could land before #3 and #4 — it pulls from
-  both.
-- **Unblocks:** `04-icu4swiftGrowthPlan.md`.
-
-### 6 — Write `04-icu4swiftGrowthPlan.md` (Stage 1 roadmap)
-Break down icu4swift's capability additions (TZ-aware adapter,
-stored `firstWeekday`/`minDaysInFirstWeek`, `DateComponents` sparse
-round-trip, `range`/`ordinality`/`dateInterval`, `nextDate`,
-`enumerateDates`) into phases with acceptance criteria.
-
-- **Delivers:** the plan that unlocks Stage 1 code.
-- **Effort:** 1 day. Needs thought about ordering + dependencies
-  between capabilities.
-- **Dependencies:** helpful to have #5 first.
-- **Unblocks:** Stage 1 code work.
-
-### 7 — Write `06-FoundationPortPlan.md` (Stages 2–4 detail)
-Per-calendar port order, risk analysis, per-phase acceptance
-criteria beyond the parity gate, rollback policy specifics.
-
-- **Delivers:** the plan for Stages 2–4.
-- **Effort:** 1 day.
-- **Dependencies:** helpful to have #5 and #6 first.
-- **Unblocks:** Stage 2/3 code work.
-
-### 8 — Write `07-OpenQuestions.md`
-Collect alignment items needing stakeholder (Apple) decisions
-before Stage 1 code begins. Different from `OPEN_ISSUES.md`, which
-holds project risks; this one holds decisions.
-
-- **Delivers:** a checklist to run past `swift-foundation`
-  maintainers once engagement opens.
-- **Effort:** half a day.
-- **Dependencies:** helpful to have #3 + #4 first so we know what
-  decisions we need.
-- **Unblocks:** maintainer conversations.
+~~### 3–8 — Write reference docs `01`–`07`~~ *(briefs done 2026-04-20)*
+All six numbered reference docs now exist as briefs:
+`01-FoundationCalendarSurface.md`, `02-ICUSurfaceToReplace.md`,
+`03-CoverageAndSemanticsGap.md`, `04-icu4swiftGrowthPlan.md`,
+`06-FoundationPortPlan.md`, `07-OpenQuestions.md`. The guiding
+Stage 1 design principle (icu4swift aligns to Foundation's API
+model, not ICU's ucal state machine) is captured prominently in
+`04`. Each brief is sufficient to orient a reader and can be
+expanded as needed.
 
 ### 9 — Begin Stage 1 code in icu4swift (smallest first)
 Pick the smallest growth item — likely stored `firstWeekday` +

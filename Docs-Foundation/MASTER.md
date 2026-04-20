@@ -36,13 +36,13 @@ Written once per topic; updated only when the design changes.
 | File | Purpose |
 |---|---|
 | **`00-Overview.md`** | Mission, destination state, scope, acceptance criteria, risk register. The "why this exists" doc. |
-| **`01-FoundationCalendarSurface.md`** *(planned)* | How `swift-foundation`'s calendar layer works today: `_CalendarProtocol`, `_CalendarGregorian`, `_CalendarICU`, `_CalendarBridged`, `CalendarCache` dispatch, the integration seam. |
-| **`02-ICUSurfaceToReplace.md`** *(planned)* | The 17 `ucal_*` functions `_CalendarICU` calls, the C++ classes behind them, what icu4swift must match behaviorally. |
-| **`03-CoverageAndSemanticsGap.md`** *(planned)* | Diagnosis: identifier map (Foundation × ICU upstream × swift-foundation-icu fork × icu4swift), capability gaps icu4swift must close. |
-| **`04-icu4swiftGrowthPlan.md`** *(planned)* | **Stage 1 roadmap.** How icu4swift grows to cover Foundation semantics (TZ awareness, firstWeekday, range/ordinality/dateInterval, nextDate/enumerateDates, sparse DateComponents). Phased plan with its own acceptance criteria. |
+| **`01-FoundationCalendarSurface.md`** | How `swift-foundation`'s calendar layer works today: `_CalendarProtocol`, `_CalendarGregorian`, `_CalendarICU`, `_CalendarBridged`, `CalendarCache` dispatch, the integration seam. |
+| **`02-ICUSurfaceToReplace.md`** | The 17 `ucal_*` functions `_CalendarICU` calls, the C++ classes behind them, and — crucially — **why ICU's API has the shape it does** (eager-recalculation consistency contract). What we are *not* porting. |
+| **`03-CoverageAndSemanticsGap.md`** | Identifier map (28 Foundation identifiers × icu4swift backends as of 2026-04-20: all 28 covered) and capability-level gap (Foundation query API surface icu4swift still needs to grow). |
+| **`04-icu4swiftGrowthPlan.md`** | **Stage 1 roadmap + the guiding design principle.** States clearly that icu4swift aligns to Foundation's API model, not ICU's ucal state machine. Lists the Foundation-shape capabilities to add (TZ adapter, stored state, sparse DateComponents, range/ordinality/dateInterval, nextDate/enumerateDates, weekend queries). Phased plan. |
 | **`05-PerformanceParityGate.md`** | Benchmark design, baseline-capture protocol, per-calendar per-operation thresholds. Proposes 3-level gate (PR, port, release), per-metric thresholds, rollout procedure. Crosscuts every stage. |
-| **`06-FoundationPortPlan.md`** *(planned)* | **Stages 2–4 roadmap.** Calendar-by-calendar port into `swift-foundation` in risk order; per-calendar acceptance gate. |
-| **`07-OpenQuestions.md`** *(planned)* | Alignment items needing stakeholder decisions before we commit to specifics. |
+| **`06-FoundationPortPlan.md`** | **Stages 2–4 roadmap.** Plumbing (Stage 2) → calendar-by-calendar port in risk order (Stage 3) → removal of `_CalendarICU` (Stage 4). Per-phase canonical flow. |
+| **`07-OpenQuestions.md`** | Alignment items needing stakeholder decisions before we commit to specifics. Organised by strategic / performance / correctness / scope / process. Distinct from `OPEN_ISSUES.md` (which is the risk register). |
 | **`MigrationIssues.md`** | Design clarifications on two early concerns (Foundation mutability, RataDie vs. millisecond time basis) that turned out to be non-issues. Captures reasoning so it is not lost. |
 | **`TIMEZONE_CONSIDERATION.md`** | How the port handles TimeZone and DST — an anticipated concern from the `swift-foundation` team. Scope boundary (TZ data out, TZ-aware adapter in), DST follow-up Q&A. |
 

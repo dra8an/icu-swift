@@ -34,13 +34,13 @@ Durable design + reference docs:
 | `BENCHMARK_RESULTS.md` | written (Chinese only) |
 | `00-Overview.md` | written |
 | `MigrationIssues.md` | written |
-| `01-FoundationCalendarSurface.md` | not started |
-| `02-ICUSurfaceToReplace.md` | not started |
-| `03-CoverageAndSemanticsGap.md` | not started |
-| `04-icu4swiftGrowthPlan.md` | not started |
+| `01-FoundationCalendarSurface.md` | written (brief) |
+| `02-ICUSurfaceToReplace.md` | written (brief) |
+| `03-CoverageAndSemanticsGap.md` | written (brief) |
+| `04-icu4swiftGrowthPlan.md` | written (brief, includes the Stage 1 design principle) |
 | `05-PerformanceParityGate.md` | written |
-| `06-FoundationPortPlan.md` | not started |
-| `07-OpenQuestions.md` | not started |
+| `06-FoundationPortPlan.md` | written (brief) |
+| `07-OpenQuestions.md` | written (brief) |
 
 ## Calendar port tracker
 
