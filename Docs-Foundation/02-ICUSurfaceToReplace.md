@@ -48,7 +48,10 @@ Every call is gated by `_mutex` in `_CalendarICU`.
 
 ### State manipulation
 
-- `ucal_clear(calendar)` — wipe all fields, mark invalid.
+- `ucal_clear(calendar)` — reset all fields to the Unix epoch
+  (Jan 1, 1970 00:00:00 UTC). Empirically verified — see
+  `FOUNDATION_APPLE.md` § "Empirical: what `ucal_clear` actually
+  does" and `Scripts/CompareDateFromComponents.c`.
 - `ucal_set(calendar, field, value)` — set one field.
 - `ucal_setMillis(calendar, millis, &status)` — set absolute time
   (lazy — field computation deferred until the first `ucal_get`).
@@ -159,6 +162,24 @@ understands what we are removing. We are specifically NOT porting:
 What we **do** implement is the subset of behaviour that Foundation's
 **public** `Calendar` API exposes, in Swift-native shape, on top
 of our existing calendar-math core. See `04-icu4swiftGrowthPlan.md`.
+
+### Foundation's public API already diverges from `ucal_set`
+
+Worth highlighting because it's the strongest evidence that the
+ucal mutation contract isn't load-bearing for users:
+`Calendar.date(bySetting:value:of:)` — a method whose name reads
+like a field setter — is implemented as a forward search via
+`enumerateDates`, not as a `ucal_set` + reconcile. Calling
+`cal.date(bySetting: .year, value: 2027, of: <Apr 21, 2026>)`
+returns **January 1, 2027 00:00:00**, not April 21, 2027.
+
+The implication: Foundation chose the search-based contract long
+ago, and `_CalendarICU` does **not** route this method through
+`ucal_set`. Removing the ucal mutation contract from the
+implementation does not change any user-visible Foundation
+behavior on this surface. Full trace and code citations are in
+`04-icu4swiftGrowthPlan.md` § "Worked example: `date(bySetting:)`
+already diverges from `ucal_set`".
 
 ## See also
 

@@ -57,6 +57,109 @@ pure functions of `(Date, Calendar, Component)` producing new
 Dates or metadata. No mutation contract, no eager recalculation,
 no cross-field consistency protocol.
 
+### Worked example: `date(bySetting:)` already diverges from `ucal_set`
+
+The strongest concrete proof that Foundation does not pass through
+ucal's stateful contract is a method whose name *sounds like it
+should*: `Calendar.date(bySetting:value:of:)`.
+
+At the C level, `ucal_set(UCAL_YEAR, 2027)` is a field swap. The
+year overwrites; every other field stays in the calendar's state;
+`ucal_getMillis` reconciles. Starting from April 21, 2026, the
+result is **April 21, 2027** (with the original time of day).
+
+Foundation's `Calendar.date(bySetting: .year, value: 2027, of: <Apr 21, 2026>)`
+returns **January 1, 2027 00:00:00**, not April 21, 2027.
+
+The implementation, at `Calendar.swift:1362`, does not call any
+ucal-equivalent setter:
+
+```swift
+public func date(bySetting component: Component, value: Int, of date: Date) -> Date? {
+    guard let currentValue = self.dateComponents([component], from: date).value(for: component) else {
+        return nil
+    }
+    guard currentValue != value else { return date }
+
+    var result: Date?
+    var targetComponents = DateComponents()
+    targetComponents.setValue(value, for: component)
+    self.enumerateDates(startingAfter: date,
+                        matching: targetComponents,
+                        matchingPolicy: .nextTime,
+                        repeatedTimePolicy: .first,
+                        direction: .forward) { date, exactMatch, stop in
+        result = date
+        stop = true
+    }
+    return result
+}
+```
+
+It builds a sparse `DateComponents` containing only the target
+field and forwards to `enumerateDates` — a constraint-satisfaction
+search. The search machinery, in `Calendar_Enumerate.swift`,
+explicitly does **not** carry over the unset fields from the
+source date when the highest set unit is `.year` (see
+`_adjustedComponents` at `Calendar_Enumerate.swift:649`, which has
+cases only for `.month` and `.day`; everything else takes the
+`default:` branch and returns the components unmodified).
+`dateAfterMatchingYear` at `:1446` then returns `yearBegin` — the
+first instant of the requested year — and every subsequent
+matcher (`dateAfterMatchingMonth`, `...Day`, `...Hour`, ...) bails
+on `guard let X = components.X else { return nil }` because no
+other field was specified.
+
+#### Three things this proves
+
+1. **The divergence between Foundation and `ucal_set` already
+   exists, by design.** It is not a regression we would introduce
+   with the port — it is a contract Foundation chose long ago
+   (the same behavior is documented for the older
+   `NSCalendar dateBySettingUnit:value:ofDate:options:`). Foundation
+   never piped ucal-set's "swap and reconcile" semantics through
+   to the user. The doc comment at `Calendar.swift:1358` admits as
+   much: *"the next available time is returned (which could be in
+   a different day, week, month, ... than the nominal target
+   date)."*
+
+2. **`date(bySetting:)` does not exercise any ucal-mutation
+   primitive.** It is implemented entirely on `struct Calendar`
+   (above the protocol) using `dateComponents(_:from:)`,
+   `setValue(_:for:)` on a sparse `DateComponents`, and
+   `enumerateDates`. The cost of `_CalendarICU`'s `ucal_set` /
+   `ucal_get` resolution is paid by **other** primitives —
+   `dateComponents(_:from:)`, `date(from:)`, `date(byAdding:to:)` —
+   not by this method. A method that *looks* like the canonical
+   case for ucal-style state machines doesn't actually use them.
+
+3. **The port has zero risk on this surface.** Because
+   `date(bySetting:)` is implemented above `_CalendarProtocol`
+   using only the Tier 1 primitives, our Swift backends inherit
+   its behavior automatically. As long as we implement
+   `dateComponents(_:from:)`, `date(from:)`, and the
+   `enumerateDates`-supporting primitives consistently with what
+   `_CalendarICU` produces *for those primitives*, the
+   `date(bySetting:)` result is bit-identical. The
+   "search-not-swap" contract is preserved by construction.
+
+#### The idiomatic field-swap
+
+If a user actually wants "April 21 in year 2027," the idiomatic
+Foundation pattern is explicit decompose / mutate / recompose:
+
+```swift
+var c = cal.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date)
+c.year = 2027
+let shifted = cal.date(from: c)   // April 21, 2027, time preserved
+```
+
+This goes through `dateComponents(_:from:)` and `date(from:)` —
+both `_CalendarProtocol` primitives we implement directly. Still
+no ucal mutation contract; the new `DateComponents` value is
+constructed by the user, not by Foundation reaching into a
+stateful calendar object.
+
 ### What this means for icu4swift
 
 - We **do not** implement ucal-style per-field setters, `add`, or
@@ -120,9 +223,14 @@ methods we need to actually implement on icu4swift's side:
 - **Copying** — `copy(changingLocale:timeZone:firstWeekday:minimumDaysInFirstWeek:gregorianStartDate:)`
 - **Hashing** — `hash(into:)`
 
-That's it for the backend contract. Roughly **10 methods**, all
-pure functions of `(Date, Calendar, Component)`, none requiring a
-mutation protocol.
+That's it for the backend contract. **11 calendar-math primitives**
+(counting the two `dateComponents(_:from:...)` overloads separately —
+one takes an explicit `TimeZone`, one uses the calendar's own),
+plus an init, a `copy(...)`, a `hash(into:)`, and a framework-only
+`bridgeToNSCalendar()`. All pure functions of
+`(Date, Calendar, Component)`, none requiring a mutation protocol.
+See `03-CoverageAndSemanticsGap.md` § "Tier 1a" for the full list
+with individual method signatures and icu4swift status.
 
 ### Tier 2 — Stored state on the calendar struct
 
@@ -194,16 +302,16 @@ icu4swift-backed calendars — we do not reimplement them:
 | `_CalendarBridged` path (NSCalendar) | Foundation-internal; not our concern |
 
 **This is the key insight for scoping Stage 1.** The ceiling isn't
-41 methods — it's 10 primitives + state + adapter. `nextDate`,
-`enumerateDates`, `RecurrenceRule`, the sequence APIs, every
-convenience wrapper — all of it routes through the same 10
-primitives. Implement them correctly and a backend "just works"
-across every Foundation API Apple ships now or ever will ship
-through this contract.
+41 methods — it's **11 calendar-math primitives + state + adapter**
+(plus init/copy/hash plumbing). `nextDate`, `enumerateDates`,
+`RecurrenceRule`, the sequence APIs, every convenience wrapper —
+all of it routes through the same 11 primitives. Implement them
+correctly and a backend "just works" across every Foundation API
+Apple ships now or ever will ship through this contract.
 
 ### Risk concentrated in four primitives
 
-Of the 10 primitives, risk is not uniform. Four carry most of the
+Of the 11 primitives, risk is not uniform. Four carry most of the
 design work:
 
 1. **`date(from: DateComponents)`** — composition. Sparse-field
@@ -264,7 +372,8 @@ the backend into the Foundation dispatch) not in Stage 1.
 
 ## Exit criterion for Stage 1
 
-icu4swift ships all 10 `_CalendarProtocol` primitives with:
+icu4swift ships all 11 `_CalendarProtocol` calendar-math primitives
+(plus init/copy/hash plumbing) with:
 
 - Functional parity: a porting of the relevant subset of
   Foundation's `CalendarTests.swift` passes.

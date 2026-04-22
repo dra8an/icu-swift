@@ -69,38 +69,55 @@ What icu4swift already provides (from `CalendarProtocol` and
 Foundation's public `Calendar` API has ~41 public methods plus
 `Calendar.RecurrenceRule`. **icu4swift does not need to implement
 41 things.** `_CalendarProtocol` — the backend contract that
-`swift-foundation`'s 41 public methods route through — has only
-**10 primitive methods** and a small set of stored properties.
-Every other Foundation method (including `nextDate`,
-`enumerateDates`, the sequence APIs, and `RecurrenceRule`) is
-implemented generically in `swift-foundation` on top of that
-protocol and comes along for free.
+`swift-foundation`'s ~41 public methods route through — has
+**11 calendar-math primitives** (plus an init, a `copy(...)`, a
+`hash(into:)`, and a framework-only `bridgeToNSCalendar()`),
+backed by **5 stored properties**. Every other Foundation method
+(including `nextDate`, `enumerateDates`, the sequence APIs, and
+`RecurrenceRule`) is implemented generically in `swift-foundation`
+on top of that protocol and comes along for free.
 
 The Stage 1 gap, in three tiers:
 
-**Tier 1 — The 10 `_CalendarProtocol` primitives icu4swift must
-provide:**
+**Tier 1a — The 11 `_CalendarProtocol` calendar-math primitives
+icu4swift must provide:**
 
-| Method | Status in icu4swift |
-|---|---|
-| `date(from: DateComponents) -> Date?` | not present |
-| `dateComponents(_: Set<Component>, from: Date)` | not present (our fields are strict) |
-| `dateComponents(_: Set<Component>, from: Date, to: Date)` | not present |
-| `date(byAdding: DateComponents, to: Date, wrappingComponents:)` | derivable from `DateArithmetic`, needs binding |
-| `minimumRange(of:)`, `maximumRange(of:)`, `range(of:in:for:)` | not present |
-| `ordinality(of:in:for:)` | not present |
-| `dateInterval(of:for:)` | not present |
-| `isDateInWeekend(_:)` | not present |
-| `copy(changingLocale:...)` | not present (no state to copy today) |
-| `hash(into:)` | trivial |
+| # | Method | Returns | Status in icu4swift |
+|:-:|---|---|---|
+| 1 | `date(from: DateComponents)` | `Date?` | not present |
+| 2 | `dateComponents(_: ComponentSet, from: Date)` | `DateComponents` | not present (our fields are strict) |
+| 3 | `dateComponents(_: ComponentSet, from: Date, in: TimeZone)` | `DateComponents` | not present — TZ-explicit sibling of #2 |
+| 4 | `dateComponents(_: ComponentSet, from: Date, to: Date)` | `DateComponents` | not present |
+| 5 | `date(byAdding: DateComponents, to: Date, wrappingComponents: Bool)` | `Date?` | derivable from `DateArithmetic`, needs binding |
+| 6 | `minimumRange(of: Component)` | `Range<Int>?` | not present |
+| 7 | `maximumRange(of: Component)` | `Range<Int>?` | not present |
+| 8 | `range(of: Component, in: Component, for: Date)` | `Range<Int>?` | not present |
+| 9 | `ordinality(of: Component, in: Component, for: Date)` | `Int?` | not present |
+| 10 | `dateInterval(of: Component, for: Date)` | `DateInterval?` | not present |
+| 11 | `isDateInWeekend(_: Date)` | `Bool` | not present |
 
-**Tier 2 — Stored state on calendar structs:**
+**Tier 1b — Protocol plumbing (required but not calendar-math):**
 
+| Method | Purpose | Status in icu4swift |
+|---|---|---|
+| `init(identifier:timeZone:locale:firstWeekday:minimumDaysInFirstWeek:gregorianStartDate:)` | Backend construction | new — calendars currently have no state |
+| `copy(changingLocale:changingTimeZone:changingFirstWeekday:changingMinimumDaysInFirstWeek:)` | COW fork on mutation (see `FOUNDATION_APPLE.md` § "How `Calendar` is structured") | not present (no state to copy today) |
+| `hash(into:)` | `Hashable` conformance | trivial |
+| `bridgeToNSCalendar()` | ObjC bridge, `#if FOUNDATION_FRAMEWORK` only | out of scope for SwiftPM path |
+
+**Tier 2 — Stored state on calendar structs (5 required):**
+
+- `identifier: Calendar.Identifier` — comes from the backend class
 - `timeZone: TimeZone` — not present
 - `firstWeekday: Int` — not present
 - `minimumDaysInFirstWeek: Int` — not present
 - `locale: Locale?` — not present
 - `gregorianStartDate: Date?` — not present (Gregorian only)
+
+(Six more properties — `preferredFirstWeekday`, `preferredMinimumDaysInFirstweek`,
+`isAutoupdating`, `isBridged`, `debugDescription`, `localeIdentifier` —
+have default implementations in the `_CalendarProtocol` extension and
+do not need to be overridden unless the backend wants to.)
 
 **Tier 3 — Shared adapter infrastructure:**
 
@@ -138,9 +155,10 @@ icu4swift-specific implementation. They live in
 
 **This is the key scope correction.** Earlier drafts of this doc
 implied icu4swift had to build ~15–20 surface methods. The real
-Stage 1 surface is 10 primitives + state + adapter. See
-`04-icu4swiftGrowthPlan.md` § "What needs to be added in Stage 1"
-for the full three-tier breakdown and phasing.
+Stage 1 surface is **11 calendar-math primitives + 5 stored
+properties + adapter** (plus the protocol plumbing — init, copy,
+hash). See `04-icu4swiftGrowthPlan.md` § "What needs to be added
+in Stage 1" for the full three-tier breakdown and phasing.
 
 ## Explicit non-gaps
 

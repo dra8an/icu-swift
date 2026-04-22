@@ -45,6 +45,18 @@ direction; you are offering to finish one that is already started.
 This reframes the pitch from "please accept my code" to "I have
 noticed a half-finished initiative and I can help with the rest."
 
+**Internal corroboration available if needed.** Foundation-rizz
+ships an internal design doc (`Docs/Calendar_Swift.md`) whose
+opening sentence is *"The overall goal is to put as much of the
+implementation of NSCalendar into Swift as possible,"* and which
+states explicitly that *"ICU's calendrical calculations are
+stateful, and initializing the data structures is expensive."* If
+the conversation needs reinforcement, you can point at their own
+doc — you are not introducing a new direction or a foreign
+concern. Issue swiftlang/swift-foundation#1842 (filed by itingliu,
+documented in `FOUNDATION_APPLE.md`) makes the same point about
+specific `ucal_*` overheads. Use as backup; do not lead with it.
+
 ### Beat 3 — One proof point (60–90 s)
 
 **Pick exactly one.** Do not tour all 23 calendars. Pick the single
@@ -141,6 +153,7 @@ Three likely rabbit holes, and the one-sentence deflection for each:
 | "What about Hindu lunisolar performance?" | "Slow tier — ~3,500 µs/date, fully astronomical, not yet baked. The 20 of 22 other calendars are sub-3 µs. Baking design for lunisolar is a documented backlog item." |
 | "What about arithmetic calendars like Hebrew?" | "Foundation is 1.3–1.7× faster there today, both sides sub-3 µs. Swift micro-optimization headroom, not a design limit. Closeable with inlining and specialization work." |
 | "Can I see your benchmark methodology?" | "Release mode, 100k iterations, warm-up excluded, checksum to prevent dead-code elimination, **no assertion macros in the timed loop** (applies to perf benchmarks only — normal correctness tests use `#expect` freely). Swift Testing's `#expect` costs ~1.5 µs per call, which dominated our own measurements before we caught it. See `05-PerformanceParityGate.md` for the formal spec and `BENCHMARK_RESULTS.md` § 'The #expect overhead finding' for the cautionary tale." |
+| "Won't removing `ucal_*` break code that depends on its mutation/recompute semantics?" | "Foundation's public API doesn't expose those semantics. The clearest example: `Calendar.date(bySetting: .year, value: 2027, of: <Apr 21, 2026>)` returns Jan 1, 2027 — not April 21, 2027. It's a forward search via `enumerateDates`, not a `ucal_set` + reconcile. Has been since NSCalendar. `_CalendarICU` doesn't even route this method through ucal. Removing ucal's mutation contract from the implementation doesn't change anything visible at the Foundation surface. Full trace in `04-icu4swiftGrowthPlan.md` § 'Worked example: `date(bySetting:)` already diverges from `ucal_set`'." |
 
 Each deflection is "yes I've thought about this, but not in the next
 90 seconds."
