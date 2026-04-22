@@ -122,6 +122,17 @@ is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
 
 ## Recent checkpoints
 
+- 2026-04-22 PM — **Phase F benchmarks** for the sub-day adapter. Median
+  of 3 runs, UTC: extraction **icu4swift 1.95× faster**, assembly
+  Foundation 1.27× faster (cost of 2 `secondsFromGMT` probes for DST
+  policy correctness), round-trip **icu4swift 1.11× faster**. Recorded
+  in `BENCHMARK_RESULTS.md § Sub-day adapter`. All six phases of
+  `FractionalRataDiePlan.md` now complete.
+  **⚠ Perf concern surfaced:** these adapter numbers are far narrower
+  than the "17–285× faster" headline from the 2026-04-19 calendar-math
+  sweep. Logged as `OPEN_ISSUES.md § Issue 8` and `PIPELINE.md § 9b`;
+  blocks pitch delivery until resolved or framed coherently.
+
 - 2026-04-22 — **Sub-day Foundation adapter implemented** (Phases A–E of
   `FractionalRataDiePlan.md`). New `CalendarFoundation` module: two free
   functions (`rataDieAndTimeOfDay`, `date`) matching `_CalendarGregorian`'s
@@ -130,8 +141,7 @@ is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
   LA spring/fall-back with `.former`/`.latter` policies, Sydney DST,
   Berlin 1900, year ±10,000 to ±1,000,000, nanosecond precision profile,
   end-of-day quirk documented. Full test suite: 383/384 (unchanged — only
-  failure is pre-existing Chinese 1906 cluster). Only Phase F (benchmarks
-  vs Foundation) remains on this plan.
+  failure is pre-existing Chinese 1906 cluster).
 
 
 

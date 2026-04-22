@@ -5,14 +5,17 @@ landing. Consult this first when resuming work on this project.*
 
 ## Most recent work (2026-04-22)
 
-**Sub-day Foundation adapter landed** (Phases A–E of
-`Docs-Foundation/FractionalRataDiePlan.md`). New `CalendarFoundation`
+**Sub-day Foundation adapter landed — all six phases A–F** of
+`Docs-Foundation/FractionalRataDiePlan.md`. New `CalendarFoundation`
 module provides `rataDieAndTimeOfDay(from:in:)` and
 `date(rataDie:hour:minute:second:nanosecond:in:repeatedTimePolicy:skippedTimePolicy:)`
 — pair of free functions matching `_CalendarGregorian`'s pattern, with
-public DST-policy enums. 45 tests, runs in ~17 ms. Full suite: 383/384
-pass (the 1 failure is the pre-existing Chinese 1906 cluster). Phase F
-(benchmarks vs Foundation) is the only remaining Phase on this plan.
+public DST-policy enums. 51 tests (45 correctness + 6 benchmarks). Full
+suite: 383/384 pass (the 1 failure is the pre-existing Chinese 1906
+cluster). Phase F perf results in `BENCHMARK_RESULTS.md § Sub-day adapter`:
+extraction **1.95× faster than Foundation**, round-trip **1.11× faster**,
+assembly 1.27× slower (cost of 2 `secondsFromGMT` probes for DST policy
+correctness — accepted).
 
 Authoritative reference: `Docs-Foundation/SUBDAY_BOUNDARY.md`
 **§ Implementation**. That doc has full API signatures, DST algorithm,

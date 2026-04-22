@@ -1,8 +1,8 @@
 # Benchmark Results — icu4swift vs. Foundation
 
-*Created 2026-04-17. Last substantive update: 2026-04-19 PM
-(clean-methodology sweep across all 22 calendars). Update as new
-benchmarks are added.*
+*Created 2026-04-17. Last substantive update: 2026-04-22 (sub-day
+adapter benchmarks, Phase F of `FractionalRataDiePlan.md`). Update as
+new benchmarks are added.*
 
 ## TL;DR — updated 2026-04-19 PM
 
@@ -607,6 +607,56 @@ of ~8 KB per-calendar data-size trade-off.
 > `.marathi`, `.telugu`, `.vikram`) are macOS 26.0+ only so I
 > haven't compared directly; they're probably faster. Baking the
 > lunisolar data is a documented backlog item."
+
+## Sub-day adapter — `CalendarFoundation` vs Foundation `Calendar` (2026-04-22)
+
+*Phase F of `FractionalRataDiePlan.md`. Source:
+`Tests/CalendarFoundationTests/FoundationAdapterBenchmarks.swift`.
+Clean harness: no `#expect` in timed loop, 100 k iterations, warm-up
+excluded, checksum depending on computed values. Foundation calendar
+is `Calendar(.gregorian)` with UTC. Median of 3 runs, release mode,
+x86_64 macOS.*
+
+### Numbers
+
+| Operation | icu4swift | Foundation | Winner |
+|---|---:|---:|---|
+| **Extraction** (Date → civil components in UTC) | 1,754 ns | 3,420 ns | **icu4swift 1.95×** |
+| **Assembly** (civil components → Date in UTC) | 3,042 ns | 2,396 ns | Foundation 1.27× |
+| **Round-trip** (Date → components → Date) | 3,683 ns | 4,094 ns | **icu4swift 1.11×** |
+
+### What each operation does
+
+- **Extraction** — icu4swift: `rataDieAndTimeOfDay(from: date, in: utc)` returning `(RataDie, secondsInDay, nanosecond)`. Foundation: `cal.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date)`.
+- **Assembly** — icu4swift: `date(rataDie:hour:minute:second:nanosecond:in:)`. Foundation: `cal.date(from: DateComponents(year:month:day:hour:minute:second:nanosecond:))`.
+- **Round-trip** — chain of extraction then assembly on both sides.
+
+### Interpretation
+
+**icu4swift wins extraction and round-trip; Foundation wins assembly.** The extraction win is the headline — Foundation's `dateComponents` goes through `_CalendarGregorian`'s full Julian-day conversion + TZ offset + Y/M/D decomposition; ours is simpler integer math on `RataDie`. The round-trip is close (1.1×) because both sides hit the same Foundation `Date` boundary at either end.
+
+**Foundation's assembly win (1.27×) is real and has a specific cause.** Our `resolveLocalTI` helper probes the time zone ±24 h around the local instant to correctly detect DST-transition skipped/repeated wall times (two `TimeZone.secondsFromGMT(for:)` calls on the fast path). Foundation's internal `TimeZone.rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:)` does the same work with one dispatch into ICU.
+
+We attempted a "1-probe + verify" fast path and reverted — it silently drops `repeatedTimePolicy: .latter` semantics on fall-back because the self-consistent offset always picks the `.former` branch. The 2-probe approach is required to respect the policy parameters. We accept the ~600 ns overhead as the cost of correctness without access to Foundation's package-level `rawAndDaylightSavingTimeOffset`.
+
+### ⚠ Discrepancy with the "17–285× faster" headline — see Issue 8
+
+These adapter numbers (1.11–1.95× wins, one 1.27× loss) are **far narrower** than the "17–285× faster than Foundation's `Calendar` API" sweep from 2026-04-19 (see `## Clean-methodology sweep` below). The likely reason is that the two benchmarks measure different things: prior sweep compared **pure calendar math** (`Date<C>.fromRataDie → toRataDie`, no `Foundation.Date` or `TimeZone`) against Foundation's full `Calendar` API, while the adapter goes through `Foundation.Date` and `TimeZone.secondsFromGMT(for:)` on both sides.
+
+This needs formal investigation before the pitch goes out. Tracked in `OPEN_ISSUES.md § Issue 8` and `PIPELINE.md § 9b`. Do **not** cite these adapter numbers in the pitch yet — they contradict the headline without explanation.
+
+### Pitch-framing note
+
+The sub-day adapter is not on the pitch's critical perf path — the calendars themselves are, and those show 17–285× via the clean-methodology sweep. But until Issue 8 is resolved we should avoid the footgun of presenting both numbers without a coherent story linking them.
+
+### Methodology
+
+Reproduce with:
+```
+swift test -c release --filter FoundationAdapterBenchmarks
+```
+
+See source at `Tests/CalendarFoundationTests/FoundationAdapterBenchmarks.swift` (6 tests: extract / assemble / round-trip × {icu4swift, Foundation}).
 
 ## Future additions
 

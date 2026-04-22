@@ -81,26 +81,60 @@ state, tests, measurement, docs.
   required for the simplest item.
 - **Unblocks:** Stage 1 momentum.
 
-### 9a — Build the sub-day Foundation adapter (fractional RataDie) — *mostly done 2026-04-22*
+~~### 9a — Build the sub-day Foundation adapter (fractional RataDie)~~ *(done 2026-04-22)*
 
-Phases A–E **shipped** in `Sources/CalendarFoundation/`. See
-`SUBDAY_BOUNDARY.md § Implementation` for API signatures and test
-inventory. 45 tests in `Tests/CalendarFoundationTests/`, full suite still
-green (383/384 — only pre-existing Chinese 1906 failure).
+All six phases (A–F) shipped in `Sources/CalendarFoundation/`. See
+`SUBDAY_BOUNDARY.md § Implementation` and `BENCHMARK_RESULTS.md § Sub-day adapter`
+for API + benchmarks. 51 tests in `Tests/CalendarFoundationTests/`
+(45 correctness + 6 benchmarks). Median perf vs Foundation in UTC:
+extraction 1.95× faster, assembly 1.27× slower, round-trip 1.11× faster.
 
-**Remaining**: Phase F — benchmark vs Foundation's `Calendar(.gregorian)`
-for extraction/assembly/round-trip operations. Expected: we're faster
-because we skip the Julian-day integer conversion and the `-43200`
-noon-nudge. Numbers would land in `BENCHMARK_RESULTS.md`.
+**But note:** the adapter perf gap is dramatically smaller than the
+"17–285× faster" headline from the 2026-04-19 sweep. See
+`OPEN_ISSUES.md § Issue 8` and pipeline item **9b** below — this
+needs investigating before the pitch.
 
-- **Delivers (remaining):** adapter benchmark numbers; first concrete
-  data point for the "we match `_CalendarGregorian`'s shape but skip
-  the noon-nudge" pitch claim.
-- **Effort:** ~1 hour for Phase F alone.
+Unblocks Stage 1 primitives (`DateComponents` decomposition, `Date<C>`
+convenience inits, `_CalendarProtocol` conformance in Stage 2).
+
+### 9b — Investigate sub-day adapter perf discrepancy
+
+Adapter benchmarks (Phase F, 2026-04-22) showed 1.11×–1.95× vs
+Foundation on extraction/round-trip and **Foundation wins 1.27× on
+assembly** — far below the "17–285× faster" headline from the
+2026-04-19 calendar-math sweep. The delta is likely because prior
+benchmarks measured pure calendar math (`Date<C>.fromRataDie →
+toRataDie`) while the adapter goes through `Foundation.Date` and
+`TimeZone.secondsFromGMT(for:)`, which have substantial overhead. But
+this needs to be **proven and documented** before pitching, not
+hand-waved. Full issue write-up: `OPEN_ISSUES.md § Issue 8`.
+
+**Scope:**
+
+1. **Isolate `TimeZone.secondsFromGMT` cost.** Benchmark it in isolation
+   (one call per iteration, UTC and non-UTC zones). Establishes the
+   floor our adapter cannot beat.
+2. **Benchmark adapter + calendar (Apples-to-apples).** Compare
+   `rataDieAndTimeOfDay + Gregorian.fromRataDie + field access` vs
+   Foundation's full `dateComponents(fullCivilSet, from:)`. And
+   assembly: `GregorianArithmetic.fixedFromGregorian + date(rataDie:...)`
+   vs Foundation's `date(from: DateComponents)`. These are the
+   real end-user comparisons.
+3. **Three-way adapter shape: icu4swift / Foundation / ICU4C direct.**
+   We already have the ICU4C bench infrastructure from
+   `Scripts/ICU4CCalBench.c`. Run the same Date↔civil shape through
+   raw ICU4C; measure the theoretical ICU floor.
+4. **Explain / correct the pitch framing.** Either keep the 17–285×
+   number with a clarifying footnote ("calendar math only; boundary
+   overhead is comparable"), or reframe as a two-tier story ("calendar
+   math: 17–285×; boundary: comparable-to-slightly-faster"). Do not
+   ship the pitch with these two numbers silently contradicting each
+   other.
+
+- **Delivers:** honest, defensible perf framing for the pitch.
+- **Effort:** 1–2 days.
 - **Dependencies:** none.
-- **Unblocks:** every downstream Stage 1 primitive (`DateComponents`
-  decomposition, `Date<C>` convenience inits, `_CalendarProtocol`
-  conformance in Stage 2).
+- **Unblocks:** item 1 (pitch delivery).
 
 ### 10 — Implement the Stage 0 benchmark harness in swift-foundation
 Build the actual harness described in `05-PerformanceParityGate.md`:
@@ -265,6 +299,30 @@ calendars.
 My recommendation: **do (a) soon as a one-off validation; (b) only
 if we want a reusable oracle for future arithmetic calendars; skip
 (c).**
+
+### 20 — Switch Hindu calendars from `MoshierEngine` to `HybridEngine`
+
+Surfaced in `Docs/DateRangeBehaviour.md` § "The Hindu gap — backlog
+item". Hindu solar + lunisolar currently take `MoshierEngine` directly
+(`HinduSolar.swift:218, 223`, and parallel sites in the lunisolar
+sources), capping their accurate range at Moshier's modern window
+(~1700–2150). Chinese / Dangi / Vietnamese use `HybridEngine`, which
+falls back to Reingold's Meeus polynomials outside the modern window —
+giving graceful ±10,000-year degradation.
+
+**Scope:** change the `engine:` type from `MoshierEngine` to
+`HybridEngine` at ~10 sites in `Sources/CalendarHindu/HinduSolar.swift`,
+plus similar count in `HinduLunisolar.swift`. Re-run the 1900–2050
+regression (55,152 lunisolar + 4×1,811 solar days). Regression sits
+inside the modern window, so should be zero-delta.
+
+- **Delivers:** uniform ±10,000-year graceful degradation across every
+  astronomical calendar. Enables "every astronomical calendar stable
+  to ±10,000 years" pitch line.
+- **Effort:** ~1 hour for the edits, plus the regression run.
+- **Dependencies:** none.
+- **Unblocks:** a clean symmetry statement in the pitch; consistent
+  engine choice across astronomical calendars.
 
 ### 13 — Extend `FoundationCalBench.swift` to macOS 26.0+ identifiers
 Wrap `dangi`, `bangla`, `tamil`, `malayalam`, `odia` in

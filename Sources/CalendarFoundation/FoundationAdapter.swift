@@ -155,13 +155,18 @@ public func date(
 ///    single DST transition (standard DST rules transition once in a
 ///    24-hour-wide window).
 /// 2. If both probes report the same offset, there is no transition
-///    nearby — fast-path.
+///    nearby — fast path, apply the offset uniformly.
 /// 3. Otherwise, form two candidates using the "before" and "after"
 ///    offsets; test each for self-consistency.
 ///    - Exactly one round-trips → normal case on one side of a DST edge.
 ///    - Both round-trip → repeated (fall-back) — apply `repeatedTimePolicy`.
 ///    - Neither round-trips → skipped (spring-forward) — apply
 ///      `skippedTimePolicy`.
+///
+/// Note: A "fast path via single probe + verify" was tried and rejected
+/// because it silently picks the `.former` branch on fall-back regardless
+/// of the caller's `repeatedTimePolicy`. The ±24 h probe is what lets us
+/// respect the policy parameters correctly.
 ///
 /// Policy semantics match Foundation's `DaylightSavingTimePolicy`
 /// (and ICU's `UCAL_TZ_LOCAL_FORMER`/`UCAL_TZ_LOCAL_LATTER`): `.former`

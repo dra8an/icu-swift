@@ -1,10 +1,11 @@
 # Fractional RataDie — implementation plan
 
-*Written 2026-04-20. **Phases A–E implemented 2026-04-22** — see
+*Written 2026-04-20. **Phases A–F implemented 2026-04-22** — see
 `SUBDAY_BOUNDARY.md § Implementation` for the resulting API and test
-summary. Phase F (benchmarks) remains. Actionable plan for the
-sub-day-time adapter between `Foundation.Date` and `RataDie`. Design
-decisions live elsewhere — this is the "how do we build it" doc.*
+summary, and `BENCHMARK_RESULTS.md § Sub-day adapter` for the Phase F
+perf numbers. Actionable plan for the sub-day-time adapter between
+`Foundation.Date` and `RataDie`. Design decisions live elsewhere —
+this is the "how do we build it" doc.*
 
 ## Pre-read (do not skip)
 
@@ -165,7 +166,16 @@ these same inputs.
 **Exit criterion:** known-quirk test matrix is green; residual
 divergences (if any) are documented.
 
-### ⏳ Phase F: Benchmark vs `_CalendarGregorian` (pending)
+### ✅ Phase F: Benchmark vs Foundation (done — 6 tests, 3-run median)
+
+Numbers landed in `BENCHMARK_RESULTS.md § Sub-day adapter`. Headlines:
+
+- Extraction: **icu4swift 1.95× faster** (1.75 µs vs 3.42 µs).
+- Assembly: Foundation 1.27× faster (2.40 µs vs 3.04 µs) — cost of the
+  ±24 h DST-detection probe; accepted as correctness over speed.
+- Round-trip: **icu4swift 1.11× faster** (3.68 µs vs 4.09 µs).
+
+*(Original plan below for reference.)*
 
 Add a benchmark file following the bench-discipline rule (no
 `#expect` in timed loop, checksum, 100k iters):

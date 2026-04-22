@@ -244,6 +244,42 @@ shippable. The port is atomic at the library level.
 
 ---
 
+## Issue 8 — Sub-day adapter perf far below our headline claims (2026-04-22)
+
+**Risk:** medium (pitch-credibility risk if unresolved before pitching).
+
+**Concern.** The headline claim across this project is **"icu4swift is 17–285× faster than Foundation's `Calendar` API"** (clean-methodology sweep 2026-04-19). The Phase F benchmarks we just ran on the `CalendarFoundation` adapter, however, show only **1.11×–1.95×** on extraction and round-trip, and actually **lose 1.27×** on assembly.
+
+Numbers (median of 3 runs, UTC, `Calendar(.gregorian)`):
+
+| Operation | icu4swift | Foundation | Winner |
+|---|---:|---:|---|
+| Extraction | 1,754 ns | 3,420 ns | icu4swift 1.95× |
+| Assembly | 3,042 ns | 2,396 ns | **Foundation 1.27×** |
+| Round-trip | 3,683 ns | 4,094 ns | icu4swift 1.11× |
+
+**Why this might not be a real problem:** the two benchmarks measure different things. The 17–285× sweep compared `Date<Gregorian>.fromRataDie → gregorian.toRataDie` (pure calendar math on an `Int64` RataDie, no `Foundation.Date` or `TimeZone` in sight) against Foundation's full `Calendar` API. The adapter benchmark compares our `rataDieAndTimeOfDay`/`date(rataDie:...)` (which DO go through `Foundation.Date` and `TimeZone.secondsFromGMT(for:)`) against the same Foundation API. The ~1,700–3,000 ns floor on our adapter is almost entirely `Foundation.Date` + `TimeZone` overhead, not our code. The underlying calendar math is still ~20 ns as before.
+
+**Why it might be a real problem:** if a realistic "end-to-end Foundation-compatible use of icu4swift" has to pay that ~2,000 ns boundary tax, then the pitch claim needs a nuance — *icu4swift's calendar math is 17–285× faster than Foundation's calendar math, but the boundary itself is ~comparable*. That's a narrower story than the current headline.
+
+**Specific things to investigate:**
+
+1. **Isolate the TZ cost.** How much of our ~1.7 µs extraction is `TimeZone.secondsFromGMT(for: date)`? If it's ≥1 µs, it dominates. That's a Foundation-API cost we can't avoid — but knowing it lets us frame the number honestly.
+2. **Apples-to-apples comparison.** Benchmark `adapter + Gregorian.fromRataDie + field accessors` (full civil extraction) vs Foundation's `dateComponents(fullCivilSet, from:)`. And assembly: `GregorianArithmetic.fixedFromGregorian + date(rataDie:...)` vs Foundation's `date(from: DateComponents)`. Those are the comparisons real users make.
+3. **Why is Foundation faster on assembly?** Our `resolveLocalTI` probes the TZ twice (±24h) to support `repeatedTimePolicy`/`skippedTimePolicy`. Foundation's internal `rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:)` does the same work in one ICU dispatch — not accessible via public API. Document the rationale (correctness over speed for DST policy) and see if there's a smarter single-probe algorithm that respects the policy.
+4. **Compare adapter numbers against ICU4C direct.** We have the three-way ICU4C/icu4swift/Foundation infrastructure from 2026-04-20. Running the adapter-shape workload through all three would contextualize whether we're close to the theoretical floor of what Foundation.Date+TimeZone permits.
+
+**What would resolve it.**
+- Publish a three-way perf matrix for the adapter shape: our numbers, Foundation's numbers, and an isolated `TimeZone.secondsFromGMT` microbench to quantify the Foundation-API floor.
+- Decide if the pitch claim needs a caveat. If the adapter is ~1× to Foundation (at the boundary) but calendar math is 50–285× (at the core), the honest framing is two-tier: "calendar math: 50–285×, boundary: comparable-to-faster."
+- Either optimize `resolveLocalTI` to match Foundation on assembly, or document why 2-probe is required (it is — our 1-probe attempt broke `.latter` policy) and accept the cost as a correctness floor.
+
+**Decision needed when:** before the pitch goes out. This is one of those "honest-numbers" items that's better surfaced proactively than discovered by a Foundation engineer with a profiler.
+
+**Tracking:** pipeline item added to investigate. See also `BENCHMARK_RESULTS.md § Sub-day adapter`.
+
+---
+
 ## Issue 7 — Timeline pessimism
 
 **Risk:** low (not a blocker, but a planning tax).

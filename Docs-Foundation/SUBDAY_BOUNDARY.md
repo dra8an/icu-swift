@@ -279,11 +279,25 @@ runs in ~17 ms**:
   RataDie.validRange bounds, nanosecond-precision profile across TI scales,
   end-of-day rollover quirk.
 
-### Remaining work (from `FractionalRataDiePlan.md`)
+### Phase F — benchmarks (done 2026-04-22)
 
-- **Phase F — benchmarks vs Foundation.** Not yet run. Expected result:
-  icu4swift faster on both extraction and assembly (we skip Julian-day
-  conversion and the `-43200` noon-nudge).
+Results in `BENCHMARK_RESULTS.md § Sub-day adapter`. Headlines vs
+`Calendar(.gregorian)` in UTC (median of 3 runs, 100 k iters, clean
+harness):
+
+| Operation | icu4swift | Foundation | Winner |
+|---|---:|---:|---|
+| Extraction | 1,754 ns | 3,420 ns | **icu4swift 1.95×** |
+| Assembly | 3,042 ns | 2,396 ns | Foundation 1.27× |
+| Round-trip | 3,683 ns | 4,094 ns | **icu4swift 1.11×** |
+
+Assembly is slower because our `resolveLocalTI` probes the TZ ±24 h
+to detect DST skipped/repeated wall times (2 `secondsFromGMT`
+calls). Foundation's internal `rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:)`
+does the same work in one ICU dispatch — we can't call it from public
+API. A "1-probe + verify" fast path was attempted and reverted — it
+silently drops `.latter` semantics on fall-back. The 2-probe approach
+is required for policy correctness.
 
 ### Phases A–E — what made it clean
 
