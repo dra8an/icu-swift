@@ -639,15 +639,33 @@ x86_64 macOS.*
 
 We attempted a "1-probe + verify" fast path and reverted — it silently drops `repeatedTimePolicy: .latter` semantics on fall-back because the self-consistent offset always picks the `.former` branch. The 2-probe approach is required to respect the policy parameters. We accept the ~600 ns overhead as the cost of correctness without access to Foundation's package-level `rawAndDaylightSavingTimeOffset`.
 
-### ⚠ Discrepancy with the "17–285× faster" headline — see Issue 8
+### Reconciling with the "17–285×" headline (resolved 2026-04-22)
 
-These adapter numbers (1.11–1.95× wins, one 1.27× loss) are **far narrower** than the "17–285× faster than Foundation's `Calendar` API" sweep from 2026-04-19 (see `## Clean-methodology sweep` below). The likely reason is that the two benchmarks measure different things: prior sweep compared **pure calendar math** (`Date<C>.fromRataDie → toRataDie`, no `Foundation.Date` or `TimeZone`) against Foundation's full `Calendar` API, while the adapter goes through `Foundation.Date` and `TimeZone.secondsFromGMT(for:)` on both sides.
+The initial adapter numbers (1.11–1.95× wins, one 1.27× loss) looked contradictory with the "17–285× faster than Foundation's `Calendar` API" sweep. Investigation (`AdapterPerfInvestigation.md`) resolved this: **the two benchmarks measure different layers of a two-layer stack.**
 
-This needs formal investigation before the pitch goes out. Tracked in `OPEN_ISSUES.md § Issue 8` and `PIPELINE.md § 9b`. Do **not** cite these adapter numbers in the pitch yet — they contradict the headline without explanation.
+**Three-way round-trip, Gregorian, UTC, full Y/M/D/h/m/s/ns:**
 
-### Pitch-framing note
+| Implementation | Median ns/op | vs ICU4C direct |
+|---|---:|---:|
+| ICU4C direct (no Swift wrapper) | **280** | 1× |
+| icu4swift adapter + Gregorian | 3,937 | 14× slower |
+| Foundation `Calendar(.gregorian)` | 6,068 | 22× slower |
 
-The sub-day adapter is not on the pitch's critical perf path — the calendars themselves are, and those show 17–285× via the clean-methodology sweep. But until Issue 8 is resolved we should avoid the footgun of presenting both numbers without a coherent story linking them.
+**Why Swift-side is 14–22× slower than ICU4C direct:** ICU4C's `UCalendar` holds TimeZone state inline; `ucal_setMillis`/`ucal_get` never cross a public TimeZone API. Both Swift paths (ours and Foundation's) go through `TimeZone.secondsFromGMT(for:)`, which costs 547–1044 ns per call on `TimeZone(identifier: "UTC")` (see Slice 1 of the investigation).
+
+**Two-layer framing the pitch should adopt:**
+
+| Layer | icu4swift | Foundation | Our win |
+|---|---:|---:|---:|
+| Calendar math only (2026-04-19 headline) | ~20 ns arithmetic / ~42 ns Chinese | ~1,400 ns arithmetic / 12,000 ns Chinese | **17–285×** |
+| Foundation.Date + TimeZone boundary | ~2,000 ns | ~2,000 ns | ≈ parity |
+| End-to-end public-API round-trip (APPLES benchmarks) | ~2,000–4,000 ns | ~3,500–6,000 ns | 1.5–2× arithmetic / 5–7× Chinese |
+
+**Stage-1-aware framing:** the 17–285× is relevant because our Stage 1 plan is to replace `_CalendarICU`, not race against the Foundation.Date public API. When our Swift backend lives **inside** `Calendar` as a `_CalendarProtocol` conformance, it shares TimeZone state with Calendar and doesn't pay the public-API dispatch tax. The end-to-end cost then drops from ~6 µs (Foundation+ICU4C+bridge) to ~2 µs (Foundation+our backend), a ~3× wrapper-inclusive improvement — driven by the 17–285× calendar-math gap.
+
+### Pitch guidance (adopted)
+
+Present the 17–285× headline with a one-line scoping: *"at the calendar-math layer, where Stage 3 replaces `_CalendarICU`."* The apples-to-apples end-to-end Gregorian round-trip is 1.5–2× (arithmetic) / 5–7× (Chinese) — credible supporting numbers that also tell the honest story.
 
 ### Methodology
 

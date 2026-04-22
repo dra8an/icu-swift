@@ -65,6 +65,7 @@ public enum DSTRepeatedTimePolicy: Sendable {
 ///   - tz: The time zone in which to interpret `date`.
 /// - Returns: Civil day number + seconds-in-day (`0..<86_400`) +
 ///   nanosecond-of-second (`0..<1_000_000_000`).
+@inlinable
 public func rataDieAndTimeOfDay(
     from date: Foundation.Date,
     in tz: Foundation.TimeZone
@@ -119,6 +120,7 @@ public func rataDieAndTimeOfDay(
 ///   - tz: Time zone in which the civil components are expressed.
 ///   - repeatedTimePolicy: Resolution for a wall time that occurs twice.
 ///   - skippedTimePolicy: Resolution for a wall time that doesn't exist.
+@inlinable
 public func date(
     rataDie: RataDie,
     hour: Int = 0,
@@ -172,7 +174,8 @@ public func date(
 /// (and ICU's `UCAL_TZ_LOCAL_FORMER`/`UCAL_TZ_LOCAL_LATTER`): `.former`
 /// uses the offset that was in effect **before** the transition;
 /// `.latter` uses the offset that came into effect **after**.
-private func resolveLocalTI(
+@inlinable
+internal func resolveLocalTI(
     _ localTI: Double,
     in tz: Foundation.TimeZone,
     repeatedTimePolicy: DSTRepeatedTimePolicy,

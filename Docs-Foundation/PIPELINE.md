@@ -97,7 +97,15 @@ needs investigating before the pitch.
 Unblocks Stage 1 primitives (`DateComponents` decomposition, `Date<C>`
 convenience inits, `_CalendarProtocol` conformance in Stage 2).
 
-### 9b — Investigate sub-day adapter perf discrepancy
+~~### 9b — Investigate sub-day adapter perf discrepancy~~ *(done 2026-04-22)*
+
+Three-slice investigation complete. Full write-up in
+`AdapterPerfInvestigation.md`. Resolution: the two benchmarks measured
+different layers (calendar-math vs full-stack), both correct with
+scoping. `BENCHMARK_RESULTS.md § Sub-day adapter` rewritten. `PITCH.md`
+Beat 3 updated with two-layer framing. Issue 8 resolved.
+
+### 9b (original write-up, resolved)
 
 Adapter benchmarks (Phase F, 2026-04-22) showed 1.11×–1.95× vs
 Foundation on extraction/round-trip and **Foundation wins 1.27× on

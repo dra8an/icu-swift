@@ -106,20 +106,30 @@ int main(int argc, char** argv) {
     }
 
     // Warm-up pass (not timed).
+    // Apples-to-apples with icu4swift/Foundation APPLES benches:
+    // full Y/M/D/h/m/s/ns round-trip.
     int64_t checksum = 0;
     for (int i = 0; i < 100 && i < iters; i++) {
         status = U_ZERO_ERROR;
         ucal_setMillis(cal, dates[i], &status);
-        int32_t era   = ucal_get(cal, UCAL_ERA, &status);
-        int32_t year  = ucal_get(cal, UCAL_YEAR, &status);
-        int32_t month = ucal_get(cal, UCAL_MONTH, &status);
-        int32_t day   = ucal_get(cal, UCAL_DATE, &status);
-        int32_t leap  = ucal_get(cal, UCAL_IS_LEAP_MONTH, &status);
+        int32_t era    = ucal_get(cal, UCAL_ERA, &status);
+        int32_t year   = ucal_get(cal, UCAL_YEAR, &status);
+        int32_t month  = ucal_get(cal, UCAL_MONTH, &status);
+        int32_t day    = ucal_get(cal, UCAL_DATE, &status);
+        int32_t hour   = ucal_get(cal, UCAL_HOUR_OF_DAY, &status);
+        int32_t minute = ucal_get(cal, UCAL_MINUTE, &status);
+        int32_t second = ucal_get(cal, UCAL_SECOND, &status);
+        int32_t ms     = ucal_get(cal, UCAL_MILLISECOND, &status);
+        int32_t leap   = ucal_get(cal, UCAL_IS_LEAP_MONTH, &status);
         ucal_clear(cal);
         ucal_set(cal, UCAL_ERA, era);
         ucal_set(cal, UCAL_YEAR, year);
         ucal_set(cal, UCAL_MONTH, month);
         ucal_set(cal, UCAL_DATE, day);
+        ucal_set(cal, UCAL_HOUR_OF_DAY, hour);
+        ucal_set(cal, UCAL_MINUTE, minute);
+        ucal_set(cal, UCAL_SECOND, second);
+        ucal_set(cal, UCAL_MILLISECOND, ms);
         if (leap) ucal_set(cal, UCAL_IS_LEAP_MONTH, leap);
         UDate back = ucal_getMillis(cal, &status);
         checksum += (int64_t)back ^ (int64_t)day;
@@ -130,16 +140,24 @@ int main(int argc, char** argv) {
     for (int i = 0; i < iters; i++) {
         status = U_ZERO_ERROR;
         ucal_setMillis(cal, dates[i], &status);
-        int32_t era   = ucal_get(cal, UCAL_ERA, &status);
-        int32_t year  = ucal_get(cal, UCAL_YEAR, &status);
-        int32_t month = ucal_get(cal, UCAL_MONTH, &status);
-        int32_t day   = ucal_get(cal, UCAL_DATE, &status);
-        int32_t leap  = ucal_get(cal, UCAL_IS_LEAP_MONTH, &status);
+        int32_t era    = ucal_get(cal, UCAL_ERA, &status);
+        int32_t year   = ucal_get(cal, UCAL_YEAR, &status);
+        int32_t month  = ucal_get(cal, UCAL_MONTH, &status);
+        int32_t day    = ucal_get(cal, UCAL_DATE, &status);
+        int32_t hour   = ucal_get(cal, UCAL_HOUR_OF_DAY, &status);
+        int32_t minute = ucal_get(cal, UCAL_MINUTE, &status);
+        int32_t second = ucal_get(cal, UCAL_SECOND, &status);
+        int32_t ms     = ucal_get(cal, UCAL_MILLISECOND, &status);
+        int32_t leap   = ucal_get(cal, UCAL_IS_LEAP_MONTH, &status);
         ucal_clear(cal);
         ucal_set(cal, UCAL_ERA, era);
         ucal_set(cal, UCAL_YEAR, year);
         ucal_set(cal, UCAL_MONTH, month);
         ucal_set(cal, UCAL_DATE, day);
+        ucal_set(cal, UCAL_HOUR_OF_DAY, hour);
+        ucal_set(cal, UCAL_MINUTE, minute);
+        ucal_set(cal, UCAL_SECOND, second);
+        ucal_set(cal, UCAL_MILLISECOND, ms);
         if (leap) ucal_set(cal, UCAL_IS_LEAP_MONTH, leap);
         UDate back = ucal_getMillis(cal, &status);
         checksum += (int64_t)back ^ (int64_t)day;

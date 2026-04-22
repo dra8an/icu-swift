@@ -244,7 +244,13 @@ shippable. The port is atomic at the library level.
 
 ---
 
-## Issue 8 — Sub-day adapter perf far below our headline claims (2026-04-22)
+## ~~Issue 8 — Sub-day adapter perf far below our headline claims~~ *(resolved 2026-04-22)*
+
+**Resolved.** See `AdapterPerfInvestigation.md`. The two benchmarks measured different layers of a two-layer stack — both numbers are correct with appropriate scoping. The 17–285× is the calendar-math layer (what Stage 3 replaces inside `_CalendarICU`). The 1.5–2× / 5–7× is the end-to-end public-API Gregorian round-trip, where the Foundation.Date + TimeZone boundary tax is paid equally by both sides. Pitch framing updated in `PITCH.md` Beat 3.
+
+**Original write-up kept for reference below.**
+
+---
 
 **Risk:** medium (pitch-credibility risk if unresolved before pitching).
 

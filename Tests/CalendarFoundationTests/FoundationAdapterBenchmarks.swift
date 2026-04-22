@@ -18,6 +18,7 @@
 import Testing
 import Foundation
 import CalendarCore
+import CalendarSimple
 import CalendarFoundation
 
 @Suite("Foundation Adapter Benchmarks")
@@ -159,4 +160,121 @@ struct FoundationAdapterBenchmarks {
             return Int64(output.timeIntervalSinceReferenceDate * 1e6)
         }
     }
+
+    // MARK: - Apples-to-apples: both sides produce/consume Y/M/D/h/m/s/ns
+
+    // Tracked in Docs-Foundation/AdapterPerfInvestigation.md § Slice 2.
+    //
+    // The benchmarks above compare operations of slightly different
+    // shape: our adapter returns (RataDie, secondsInDay, nanosecond)
+    // while Foundation returns (Y, M, D, h, m, s, ns). To compare
+    // fairly we pair our adapter with `GregorianArithmetic.gregorianFromFixed`
+    // / `.fixedFromGregorian` to produce / consume the same Y/M/D
+    // representation.
+
+    @Test("APPLES: Extraction — icu4swift adapter + Gregorian → (Y,M,D,h,m,s,ns)")
+    func applesExtractIcu() {
+        let utc = Self.utc
+        runBench("icu4swift adapter+Gregorian extract") { i in
+            let d = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.0 * 3_600)
+            let (rd, sec, ns) = rataDieAndTimeOfDay(from: d, in: utc)
+            let ymd = GregorianArithmetic.gregorianFromFixed(rd)
+            let hour = sec / 3_600
+            let minute = (sec % 3_600) / 60
+            let second = sec % 60
+            return Int64(ymd.year) &+ Int64(ymd.month) &+ Int64(ymd.day)
+                 &+ Int64(hour) &+ Int64(minute) &+ Int64(second) &+ Int64(ns)
+        }
+    }
+
+    @Test("APPLES: Extraction — Foundation dateComponents([Y,M,D,h,m,s,ns])")
+    func applesExtractFoundation() {
+        let cal = Self.foundationCalendar
+        runBench("Foundation dateComponents extract") { i in
+            let d = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.0 * 3_600)
+            let dc = cal.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second, .nanosecond],
+                from: d
+            )
+            return Int64(dc.year ?? 0) &+ Int64(dc.month ?? 0) &+ Int64(dc.day ?? 0)
+                 &+ Int64(dc.hour ?? 0) &+ Int64(dc.minute ?? 0) &+ Int64(dc.second ?? 0)
+                 &+ Int64(dc.nanosecond ?? 0)
+        }
+    }
+
+    @Test("APPLES: Assembly — icu4swift Gregorian + adapter ← (Y,M,D,h,m,s,ns)")
+    func applesAssembleIcu() {
+        let utc = Self.utc
+        runBench("icu4swift Gregorian+adapter assemble") { i in
+            let day = UInt8(1 + (i % 28))
+            let month = UInt8(1 + ((i / 28) % 12))
+            let year = Int32(2024 + (i / (28 * 12)))
+            let rd = GregorianArithmetic.fixedFromGregorian(year: year, month: month, day: day)
+            let d = date(
+                rataDie: rd,
+                hour: 12, minute: 30, second: 15, nanosecond: 123_456_789,
+                in: utc
+            )
+            return Int64(d.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("APPLES: Assembly — Foundation date(from: DateComponents(Y,M,D,h,m,s,ns))")
+    func applesAssembleFoundation() {
+        let cal = Self.foundationCalendar
+        runBench("Foundation date(from:) assemble") { i in
+            let day = 1 + (i % 28)
+            let month = 1 + ((i / 28) % 12)
+            let year = 2024 + (i / (28 * 12))
+            let dc = DateComponents(
+                year: year, month: month, day: day,
+                hour: 12, minute: 30, second: 15, nanosecond: 123_456_789
+            )
+            guard let d = cal.date(from: dc) else { return 0 }
+            return Int64(d.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("APPLES: Round-trip — icu4swift (Date → (Y,M,D,h,m,s,ns) → Date)")
+    func applesRoundTripIcu() {
+        let utc = Self.utc
+        runBench("icu4swift full round-trip") { i in
+            // Date → components
+            let input = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.5 * 3_600)
+            let (rd, sec, ns) = rataDieAndTimeOfDay(from: input, in: utc)
+            let ymd = GregorianArithmetic.gregorianFromFixed(rd)
+            let hour = sec / 3_600
+            let minute = (sec % 3_600) / 60
+            let second = sec % 60
+            // components → Date
+            let rdBack = GregorianArithmetic.fixedFromGregorian(
+                year: ymd.year, month: ymd.month, day: ymd.day
+            )
+            let output = date(
+                rataDie: rdBack,
+                hour: hour, minute: minute, second: second, nanosecond: ns,
+                in: utc
+            )
+            return Int64(output.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("APPLES: Round-trip — Foundation (Date → DateComponents → Date)")
+    func applesRoundTripFoundation() {
+        let cal = Self.foundationCalendar
+        runBench("Foundation full round-trip") { i in
+            let input = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.5 * 3_600)
+            let dc = cal.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second, .nanosecond],
+                from: input
+            )
+            guard let output = cal.date(from: dc) else { return 0 }
+            return Int64(output.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
 }

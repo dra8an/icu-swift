@@ -67,27 +67,37 @@ for a Foundation engineer:
    is architected to match **Foundation's Date/Calendar API model** —
    immutable value dates, high-level queries (`range`, `ordinality`,
    `dateInterval`, `nextDate`, `enumerateDates`), no ucal-style
-   per-field mutation with eager recalculation. Our benchmarks
-   reflect that alignment: atomic `fromRataDie` / `toRataDie` round-trips.
-   
-   Three-way measurement — icu4swift, ICU4C direct via `ucal_*`
-   (no Swift wrapper), Foundation's public Calendar API — matched
-   methodology, 100k iterations, release mode:
-   - **Arithmetic calendars**: icu4swift 9–26 ns, ICU4C 250–330 ns,
-     Foundation ~1,100–1,200 ns. **10–40× faster than raw ICU4C.**
+   per-field mutation with eager recalculation.
+
+   **At the calendar-math layer — the layer Stage 3 replaces inside
+   `_CalendarICU`:** three-way measurement, matched methodology, 100k
+   iterations, release mode:
+   - **Arithmetic calendars**: icu4swift 9–26 ns, ICU4C direct
+     250–330 ns, Foundation's public `Calendar` API ~1,100–1,200 ns.
+     **10–40× faster than raw ICU4C.**
    - **Chinese** (baked HKO data): icu4swift **42 ns**, Foundation
-     ~12,000 ns, raw ICU4C ~41,000 ns. **~1,000× faster than raw ICU4C.**
-   
+     ~12,000 ns, ICU4C direct ~41,000 ns. **~1,000× faster than raw ICU4C.**
+
    The gap is **not** a clever optimization — ICU's per-field get/set
-   contract forces full recomputation of every field (julian day,
-   day-of-week, is-leap, zone offset, plus Chinese astronomy) on
-   every access. That's the cost of ucal's shape. Foundation's
-   public API doesn't require it, and we don't pay for it."
-   
-   See `BENCHMARK_RESULTS.md` for the full table. Stage 1 (adding
-   Foundation-shaped query APIs on top of our core) will produce
-   genuinely end-to-end comparisons. The math-speed advantage
-   measured here is the foundation those numbers will build on.
+   contract forces full recomputation of every field on every access.
+   That's the cost of ucal's shape. Foundation's public API doesn't
+   require it, and we don't pay for it.
+
+   **Scoping:** this is the calendar-math layer, *below* the
+   Foundation.Date + TimeZone public-API dispatch. An end-to-end
+   apples-to-apples Gregorian round-trip (Date → Y/M/D/h/m/s/ns →
+   Date in UTC, full public-API stack on both sides) is **1.5–2×
+   faster** on arithmetic calendars and **5–7× faster** on Chinese —
+   the boundary tax hides most of the calendar-math gap from a
+   direct user. But that tax **goes away** when we wire our backend
+   into `_CalendarProtocol` and share TimeZone state with Calendar
+   the way `_CalendarICU` does today. That's when the 10–40× /
+   1,000× math-speed advantage translates directly into wrapper-
+   inclusive end-to-end wins."
+
+   See `BENCHMARK_RESULTS.md` for the full tables (calendar-math,
+   end-to-end apples-to-apples, three-way with ICU4C direct). See
+   `AdapterPerfInvestigation.md` for why the two-layer framing.
 
 2. **Code size.** "Chinese calendar in icu4swift is ~600 lines of
    Swift. ICU's `chnsecal.cpp` + `astro.cpp` is around 4,000 lines of
