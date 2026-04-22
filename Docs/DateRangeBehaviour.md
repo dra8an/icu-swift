@@ -154,14 +154,22 @@ private let engine: MoshierEngine
 self.engine = MoshierEngine()
 ```
 
-Changing those two lines and the `engine:` parameter declarations
-(~10 sites in `HinduSolar.swift`, similar count in the lunisolar
-sources) to `HybridEngine` should be ~1 hour of mechanical work
-plus a re-run of the 1900–2100 regression tests. The regression
-sits inside the modern window, so it shouldn't move — the win is
-purely outside the window.
+**⚠ Correction (2026-04-22).** An earlier version of this section
+described the switch as *"~1 hour of mechanical work — change the
+type at ~10 call sites."* A code inspection found that the `engine:
+MoshierEngine` parameter on the Hindu path is **vestigial —
+declared but never dereferenced**. Changing its type is cosmetic and
+does not change runtime behaviour. The Hindu astronomy happens via
+direct static calls to `MoshierSunrise.*` / `MoshierSolar.*` /
+`MoshierLunar.*` (9 call sites across 3 files), which bypass the
+`HybridEngine` dispatch layer entirely.
 
-**Payoff:**
+Full write-up of the real scope (Option A shim layer ~2–3 h vs
+Option B full refactor ~4–6 h vs Option C vestigial-param cleanup
+~30 min) lives in **`Docs/HinduEngineSwitch.md`**. When the item is
+picked up for real, start there.
+
+**Payoff (once actually done):**
 
 - Every astronomical calendar becomes valid across ±10,000 years
   at Meeus precision.
@@ -170,13 +178,18 @@ purely outside the window.
 - Matches the symmetry principle — treat astronomical calendars
   uniformly via `HybridEngine`, no calendar-specific engine choice.
 
+**Pitch framing until this lands:** do **not** claim Hindu
+astronomical calendars are stable to ±10,000 years. They are only
+accurate in Moshier's modern window (~1700–2150); outside, they
+silently diverge. Chinese / Dangi / Vietnamese are stable to
+±10,000 years — those already use `HybridEngine`.
+
 **Why it wasn't done originally:** when Hindu landed (Phase 5,
 before `HybridEngine` was introduced in Phase 4a) the code took
 `MoshierEngine` explicitly. Not re-plumbed since.
 
-Tracked as a candidate item in this doc rather than pipeline —
-small enough to do opportunistically when next touching Hindu
-code.
+Tracked in `Docs-Foundation/PIPELINE.md § 20` — see
+`Docs/HinduEngineSwitch.md` for the refactor plan.
 
 ## Implications for the Foundation port
 

@@ -302,24 +302,37 @@ if we want a reusable oracle for future arithmetic calendars; skip
 
 ### 20 — Switch Hindu calendars from `MoshierEngine` to `HybridEngine`
 
-Surfaced in `Docs/DateRangeBehaviour.md` § "The Hindu gap — backlog
-item". Hindu solar + lunisolar currently take `MoshierEngine` directly
-(`HinduSolar.swift:218, 223`, and parallel sites in the lunisolar
-sources), capping their accurate range at Moshier's modern window
-(~1700–2150). Chinese / Dangi / Vietnamese use `HybridEngine`, which
-falls back to Reingold's Meeus polynomials outside the modern window —
-giving graceful ±10,000-year degradation.
+Hindu solar + lunisolar currently dispatch Moshier astronomy via
+**direct static calls** (`MoshierSunrise.sunrise`,
+`MoshierSolar.solarLongitude`, etc.) rather than through the
+`HybridEngine` range-dispatch layer that Chinese / Dangi /
+Vietnamese use. Outside Moshier's modern window (~1700–2150) Hindu
+silently diverges — same astronomy, wrong answers.
 
-**Scope:** change the `engine:` type from `MoshierEngine` to
-`HybridEngine` at ~10 sites in `Sources/CalendarHindu/HinduSolar.swift`,
-plus similar count in `HinduLunisolar.swift`. Re-run the 1900–2050
-regression (55,152 lunisolar + 4×1,811 solar days). Regression sits
-inside the modern window, so should be zero-delta.
+**⚠ Corrected scope (2026-04-22).** An earlier version of this
+item estimated "~1 hour — just change the `engine:` parameter
+type." A code inspection found that parameter is **vestigial
+(declared, never dereferenced)**. Real scope is 2–6 hours
+depending on approach. Full write-up in
+**`Docs/HinduEngineSwitch.md`** — read before picking this up.
 
-- **Delivers:** uniform ±10,000-year graceful degradation across every
-  astronomical calendar. Enables "every astronomical calendar stable
-  to ±10,000 years" pitch line.
-- **Effort:** ~1 hour for the edits, plus the regression run.
+Three options documented there:
+
+- **Option A** (~2–3 h): add `HybridSunrise`, `HybridSolar`,
+  `HybridLunar` shim types with static JD-taking methods that
+  dispatch by range; replace 9 call sites. Recommended for the
+  real win.
+- **Option B** (~4–6 h): refactor Hindu to use `HybridEngine`
+  instances via the engine protocol; change signatures through
+  the variant protocol. Cleaner long-term; heavier refactor.
+- **Option C** (~30 min): remove the vestigial `engine:` parameter
+  as a cleanup. Zero functional change; does **not** deliver the
+  pitch claim.
+
+- **Delivers (Option A or B):** uniform ±10,000-year graceful
+  degradation across every astronomical calendar. Enables "every
+  astronomical calendar stable to ±10,000 years" pitch line.
+- **Effort:** 2–3 h (A) / 4–6 h (B) / 30 min (C, partial).
 - **Dependencies:** none.
 - **Unblocks:** a clean symmetry statement in the pitch; consistent
   engine choice across astronomical calendars.
