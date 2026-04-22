@@ -22,6 +22,14 @@ public struct RataDie: Sendable, Hashable {
     /// The `RataDie` corresponding to the Unix epoch (January 1, 1970).
     public static let unixEpoch = RataDie(719_163)
 
+    /// The `RataDie` corresponding to `Foundation.Date`'s reference date
+    /// (January 1, 2001 UTC midnight).
+    ///
+    /// Used by the `Foundation.Date ↔ RataDie` adapter in `CalendarFoundation`.
+    /// Derived: `unixEpoch (1970-01-01) + 11_323` days = R.D. 730_486
+    /// (31 years × 365 + 8 leap days between 1970 and 2001).
+    public static let foundationEpoch = RataDie(730_486)
+
     /// Creates a `RataDie` from a count of days since the Unix epoch.
     public static func fromUnixEpochDays(_ days: Int64) -> RataDie {
         RataDie(days + unixEpoch.dayNumber)

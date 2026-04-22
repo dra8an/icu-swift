@@ -9,6 +9,12 @@ struct RataDieTests {
         #expect(RataDie.unixEpoch.dayNumber == 719_163)
     }
 
+    @Test("Foundation epoch (2001-01-01 UTC) is R.D. 730486 = unixEpoch + 11323")
+    func foundationEpoch() {
+        #expect(RataDie.foundationEpoch.dayNumber == 730_486)
+        #expect(RataDie.foundationEpoch.dayNumber - RataDie.unixEpoch.dayNumber == 11_323)
+    }
+
     @Test("Round-trip through Unix epoch days")
     func unixRoundTrip() {
         for days: Int64 in [-100_000, -1, 0, 1, 1000, 19000, 100_000] {

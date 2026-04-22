@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "AstronomicalEngine", targets: ["AstronomicalEngine"]),
         .library(name: "CalendarAstronomical", targets: ["CalendarAstronomical"]),
         .library(name: "CalendarHindu", targets: ["CalendarHindu"]),
+        .library(name: "CalendarFoundation", targets: ["CalendarFoundation"]),
     ],
     targets: [
         .target(
@@ -30,7 +31,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CalendarCoreTests",
-            dependencies: ["CalendarCore"],
+            dependencies: ["CalendarCore", "CalendarSimple"],
             path: "Tests/CalendarCoreTests"
         ),
         .target(
@@ -97,6 +98,16 @@ let package = Package(
             name: "CalendarJapaneseTests",
             dependencies: ["CalendarJapanese", "CalendarSimple", "CalendarCore"],
             path: "Tests/CalendarJapaneseTests"
+        ),
+        .target(
+            name: "CalendarFoundation",
+            dependencies: ["CalendarCore"],
+            path: "Sources/CalendarFoundation"
+        ),
+        .testTarget(
+            name: "CalendarFoundationTests",
+            dependencies: ["CalendarFoundation", "CalendarCore"],
+            path: "Tests/CalendarFoundationTests"
         ),
     ]
 )

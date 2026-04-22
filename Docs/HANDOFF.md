@@ -1,6 +1,22 @@
 # icu4swift — Session Handoff
 
-*Written 2026-04-20. Consult this first when resuming work on this project.*
+*Written 2026-04-20. Updated 2026-04-22 with CalendarFoundation adapter
+landing. Consult this first when resuming work on this project.*
+
+## Most recent work (2026-04-22)
+
+**Sub-day Foundation adapter landed** (Phases A–E of
+`Docs-Foundation/FractionalRataDiePlan.md`). New `CalendarFoundation`
+module provides `rataDieAndTimeOfDay(from:in:)` and
+`date(rataDie:hour:minute:second:nanosecond:in:repeatedTimePolicy:skippedTimePolicy:)`
+— pair of free functions matching `_CalendarGregorian`'s pattern, with
+public DST-policy enums. 45 tests, runs in ~17 ms. Full suite: 383/384
+pass (the 1 failure is the pre-existing Chinese 1906 cluster). Phase F
+(benchmarks vs Foundation) is the only remaining Phase on this plan.
+
+Authoritative reference: `Docs-Foundation/SUBDAY_BOUNDARY.md`
+**§ Implementation**. That doc has full API signatures, DST algorithm,
+precision profile, and test inventory.
 
 ## What is this project
 

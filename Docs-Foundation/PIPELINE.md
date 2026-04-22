@@ -81,21 +81,23 @@ state, tests, measurement, docs.
   required for the simplest item.
 - **Unblocks:** Stage 1 momentum.
 
-### 9a — Build the sub-day Foundation adapter (fractional RataDie)
-Pair of free functions between `Foundation.Date` and
-`(RataDie, secondsInDay, nanosecond)` — matches `_CalendarGregorian`'s
-pattern. Full plan + phased build order in
-`FractionalRataDiePlan.md`. Six phases (A–F) totaling ~1 working day.
-No existing code changes; no calendar backends involved; independently
-testable. Benchable vs. Foundation directly — clean first data point
-for the "we match `_CalendarGregorian`'s shape but skip the noon-nudge"
-claim.
+### 9a — Build the sub-day Foundation adapter (fractional RataDie) — *mostly done 2026-04-22*
 
-- **Delivers:** working `Foundation.Date ↔ (RD, h, m, s, ns)` adapter
-  + benchmark vs. Foundation's path. First visible Stage 1 result.
-- **Effort:** ~1 working day.
-- **Dependencies:** design decisions are locked in `SUBDAY_BOUNDARY.md`
-  and `Docs/RDvsJD.md`. Ready to build.
+Phases A–E **shipped** in `Sources/CalendarFoundation/`. See
+`SUBDAY_BOUNDARY.md § Implementation` for API signatures and test
+inventory. 45 tests in `Tests/CalendarFoundationTests/`, full suite still
+green (383/384 — only pre-existing Chinese 1906 failure).
+
+**Remaining**: Phase F — benchmark vs Foundation's `Calendar(.gregorian)`
+for extraction/assembly/round-trip operations. Expected: we're faster
+because we skip the Julian-day integer conversion and the `-43200`
+noon-nudge. Numbers would land in `BENCHMARK_RESULTS.md`.
+
+- **Delivers (remaining):** adapter benchmark numbers; first concrete
+  data point for the "we match `_CalendarGregorian`'s shape but skip
+  the noon-nudge" pitch claim.
+- **Effort:** ~1 hour for Phase F alone.
+- **Dependencies:** none.
 - **Unblocks:** every downstream Stage 1 primitive (`DateComponents`
   decomposition, `Date<C>` convenience inits, `_CalendarProtocol`
   conformance in Stage 2).

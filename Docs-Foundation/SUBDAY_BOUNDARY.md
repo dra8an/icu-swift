@@ -1,9 +1,10 @@
-# Sub-day precision at the Foundation boundary — decision record
+# Sub-day precision at the Foundation boundary — decision + implementation record
 
 *Decided 2026-04-20. **Re-confirmed 2026-04-20 evening** after a
 session-reset confusion where the resumed session mistakenly tried to
-revive the rejected `CivilInstant` design. **This document is
-authoritative. Do not re-open unless there is a concrete, new reason.***
+revive the rejected `CivilInstant` design. **Implemented 2026-04-22**
+in `Sources/CalendarFoundation/`. **This document is authoritative.
+Do not re-open unless there is a concrete, new reason.***
 
 ## The one-sentence answer
 
@@ -175,6 +176,131 @@ resolution`. Deleted source: `Sources/CalendarCore/CivilInstant.swift`
   demonstrated, not speculated).
 
 Without one of these, leave the decision closed.
+
+## Implementation (2026-04-22)
+
+### What exists
+
+New module **`CalendarFoundation`** (depends on `CalendarCore` + Foundation):
+
+- `Sources/CalendarFoundation/FoundationAdapter.swift` (≈170 lines).
+- Two public top-level functions (see signatures below).
+- Two public policy enums: `DSTSkippedTimePolicy`, `DSTRepeatedTimePolicy`.
+- One public constant: `RataDie.foundationEpoch = RataDie(730_486)` (2001-01-01 UTC).
+
+### Public API
+
+```swift
+import CalendarFoundation
+import Foundation
+import CalendarCore
+
+// Extraction: Date → (RataDie, secondsInDay, nanosecond)
+public func rataDieAndTimeOfDay(
+    from date: Foundation.Date,
+    in tz: Foundation.TimeZone
+) -> (rataDie: RataDie, secondsInDay: Int, nanosecond: Int)
+
+// Assembly: (RataDie, h, m, s, ns) → Date
+public func date(
+    rataDie: RataDie,
+    hour: Int = 0,
+    minute: Int = 0,
+    second: Int = 0,
+    nanosecond: Int = 0,
+    in tz: Foundation.TimeZone,
+    repeatedTimePolicy: DSTRepeatedTimePolicy = .former,
+    skippedTimePolicy: DSTSkippedTimePolicy = .former
+) -> Foundation.Date
+
+public enum DSTSkippedTimePolicy: Sendable  { case former, latter }
+public enum DSTRepeatedTimePolicy: Sendable { case former, latter }
+```
+
+Semantics match Foundation's internal `TimeZone.DaylightSavingTimePolicy`
+(and ICU's `UCAL_TZ_LOCAL_FORMER`/`UCAL_TZ_LOCAL_LATTER`):
+- **Skipped** (`.former`): use the offset that was in effect **before** the
+  DST transition. For US spring-forward 02:30, that's PST.
+- **Skipped** (`.latter`): use the offset that came into effect **after**
+  the transition. For US spring-forward 02:30, that's PDT.
+- **Repeated** (`.former`): return the chronologically earlier occurrence
+  (before fall-back).
+- **Repeated** (`.latter`): return the chronologically later occurrence
+  (after fall-back).
+
+### How assembly resolves DST
+
+`resolveLocalTI(_:in:repeatedTimePolicy:skippedTimePolicy:)` (private helper):
+
+1. Probe the zone at ±24 h around the local time. Standard DST rules
+   transition once in any 24-hour-wide window, so this always spans the
+   boundary.
+2. Fast path: if both probes report the same offset, apply it and return.
+3. Otherwise, form two candidates (pre-transition and post-transition
+   offsets), test each for self-consistency via `tz.secondsFromGMT(for:)`:
+   - **Both round-trip → repeated** (fall-back). Apply `repeatedTimePolicy`.
+   - **Neither round-trips → skipped** (spring-forward). Apply `skippedTimePolicy`.
+   - **Exactly one round-trips** → normal case on one side of the DST edge.
+
+### Precision profile
+
+Inherited from `Foundation.Date` (Double `TimeInterval`). At TI ≈ 7.4e8
+(2024 era), sub-second precision is approximately:
+
+| TI magnitude | Era | Precision |
+|---|---|---:|
+| ~0 | 2001 reference | ~1 ns |
+| ~1e7 | ~2001 ± 0.3 y | ~1 ns |
+| ~1e8 | ~2001 ± 3 y | ~10 ns |
+| ~1e9 | ~2001 ± 30 y (covers 1970–2030) | ~100 ns |
+| ~1e10 | ~2001 ± 300 y | ~1000 ns |
+
+Documented Double-precision quirk at end-of-day: `23:59:59.999_999_999`
+round-trips to next-day midnight because `Double(totalSec) + 0.999_999_999`
+lands on the next integer at this magnitude. Matches Foundation's own
+behavior; callers needing full ns precision at end-of-day should use
+millisecond-scale inputs or offset their reference.
+
+### Tests
+
+`Tests/CalendarFoundationTests/FoundationAdapterTests.swift` — **45 tests,
+runs in ~17 ms**:
+
+- **Phase A (UTC, 12 tests):** reference date, Unix epoch, every civil
+  hour of 2024-06-15, nanosecond extraction, pre-reference dates, end-of-day.
+- **Phase B (fixed-offset, 10 tests):** ±05:00, ±13:00, +00:30, +05:45,
+  `America/Phoenix` (no-DST named TZ), years 1900 and 2100, cross-TZ
+  consistency.
+- **Phase C (DST, 14 tests):** LA spring-forward and fall-back at the
+  exact skipped/repeated wall times with both `.former` and `.latter`,
+  asymmetry sanity checks, pre/post-transition round-trips on both
+  transition days, Sydney, Berlin 1900, default-policy check.
+- **Phase D/E (extremes + nanoseconds, 9 tests):** year ±10,000, +1,000,000,
+  RataDie.validRange bounds, nanosecond-precision profile across TI scales,
+  end-of-day rollover quirk.
+
+### Remaining work (from `FractionalRataDiePlan.md`)
+
+- **Phase F — benchmarks vs Foundation.** Not yet run. Expected result:
+  icu4swift faster on both extraction and assembly (we skip Julian-day
+  conversion and the `-43200` noon-nudge).
+
+### Phases A–E — what made it clean
+
+- **Matching `_CalendarGregorian`'s shape** meant no novel algorithm
+  design. Extraction and assembly are direct translations with the
+  midnight-base simplification (RataDie, not JD).
+- **RD-based epoch constant** (`foundationEpoch = 730_486`) centralises
+  the one magic number the adapter needs. Derivation (`= unixEpoch + 11_323`)
+  is in-code and verified by test.
+- **Private DST policy enums** avoided a dependency on Foundation's
+  `package`-level `DaylightSavingTimePolicy`. Semantics match ICU's
+  `UCAL_TZ_LOCAL_FORMER/LATTER` exactly.
+- **The ±24h probe is always sufficient** for standard DST because
+  transitions never move offsets more than once per 24h at a given
+  instant. Exotic TZs (Antarctica's Troll Station, Samoa's IDL jump)
+  might not fit this assumption, but aren't in Foundation's tzdata in
+  ways that affect our adapter.
 
 ## Cross-references
 

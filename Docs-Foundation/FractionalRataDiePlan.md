@@ -1,8 +1,10 @@
 # Fractional RataDie — implementation plan
 
-*Written 2026-04-20. Actionable plan for the sub-day-time adapter
-between `Foundation.Date` and `RataDie`. Design decisions live
-elsewhere — this is the "how do we build it" doc.*
+*Written 2026-04-20. **Phases A–E implemented 2026-04-22** — see
+`SUBDAY_BOUNDARY.md § Implementation` for the resulting API and test
+summary. Phase F (benchmarks) remains. Actionable plan for the
+sub-day-time adapter between `Foundation.Date` and `RataDie`. Design
+decisions live elsewhere — this is the "how do we build it" doc.*
 
 ## Pre-read (do not skip)
 
@@ -100,7 +102,7 @@ Include a compile-time-derivable test: assert it matches
 Land each phase as its own commit + PR. Don't bundle — each stage
 has meaningful independent value and a clear test story.
 
-### Phase A: UTC-only happy path (2 hours)
+### ✅ Phase A: UTC-only happy path (done — 12 tests)
 
 - Add `foundationEpoch` constant on RataDie + test.
 - Implement both functions for UTC only; error or no-op when
@@ -111,7 +113,7 @@ has meaningful independent value and a clear test story.
 
 **Exit criterion:** 10+ round-trip tests in UTC pass. Ship it.
 
-### Phase B: Fixed-offset TZ (1 hour)
+### ✅ Phase B: Fixed-offset TZ (done — 10 tests)
 
 - Extend with `tz.secondsFromGMT(for: date)` call. Works for any
   non-DST TZ (UTC+N, America/Phoenix, etc.).
@@ -121,7 +123,11 @@ has meaningful independent value and a clear test story.
 **Exit criterion:** Round-trips pass for fixed-offset zones at year
 extremes (1900, 2100).
 
-### Phase C: DST via `rawAndDaylightSavingTimeOffset` (2 hours)
+### ✅ Phase C: DST resolution (done — 14 tests)
+
+**Deviation from original plan:** the `TimeZone.rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:)` method turned out to be `internal` in swift-foundation (not public), and `TimeZone.DaylightSavingTimePolicy` is `package`. We rolled our own detection using public `TimeZone.secondsFromGMT(for:)` with a ±24h probe — see `SUBDAY_BOUNDARY.md § How assembly resolves DST`. Semantics match ICU's `UCAL_TZ_LOCAL_FORMER/LATTER` exactly, validated against real LA and Sydney DST transitions.
+
+*(Original plan below for reference.)*
 
 - Switch extraction to use
   `tz.rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:)` —
@@ -137,7 +143,7 @@ extremes (1900, 2100).
 **Exit criterion:** our output matches `_CalendarGregorian` for
 these same inputs.
 
-### Phase D: Double-fallback path (1 hour)
+### ✅ Phase D: Double-fallback path (done)
 
 - Copy `_CalendarGregorian.swift:2078–2091` logic for
   `|dateOffsetInSeconds| ≥ Int.max`.
@@ -148,7 +154,7 @@ these same inputs.
 **Exit criterion:** extreme-year round-trips agree with
 `_CalendarGregorian` bit-for-bit (within Double precision).
 
-### Phase E: Nanosecond edge cases (1 hour)
+### ✅ Phase E: Nanosecond edge cases (done — 9 tests combined with D)
 
 - Test 999_999_999 / 1_000_000_000 boundary behavior.
 - Test negative `timeIntervalSinceReferenceDate` (pre-2001 dates)
@@ -159,7 +165,7 @@ these same inputs.
 **Exit criterion:** known-quirk test matrix is green; residual
 divergences (if any) are documented.
 
-### Phase F: Benchmark vs `_CalendarGregorian` (1 hour)
+### ⏳ Phase F: Benchmark vs `_CalendarGregorian` (pending)
 
 Add a benchmark file following the bench-discipline rule (no
 `#expect` in timed loop, checksum, 100k iters):

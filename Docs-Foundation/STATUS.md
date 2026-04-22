@@ -10,12 +10,15 @@ One-page snapshot of where the project stands. For the roadmap see
 | Stage | Title | Status |
 |---|---|---|
 | 0 | Performance parity gate (crosscuts) | not started |
-| 1 | Extend icu4swift | not started |
+| 1 | Extend icu4swift | **in progress — sub-day adapter landed 2026-04-22** |
 | 2 | Plumbing in swift-foundation | not started |
 | 3 | Port calendars in risk order | not started |
 | 4 | Removal | not started |
 
-**Current phase of active work:** planning / documentation.
+**Current phase of active work:** Stage 1. Sub-day Foundation adapter
+(`CalendarFoundation` module) complete through Phase E of
+`FractionalRataDiePlan.md`. 45 new tests passing. See
+`SUBDAY_BOUNDARY.md § Implementation` for the API + test inventory.
 
 ## Documentation
 
@@ -118,6 +121,19 @@ is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
 — see `OPEN_ISSUES.md` § "Recommended sequencing".
 
 ## Recent checkpoints
+
+- 2026-04-22 — **Sub-day Foundation adapter implemented** (Phases A–E of
+  `FractionalRataDiePlan.md`). New `CalendarFoundation` module: two free
+  functions (`rataDieAndTimeOfDay`, `date`) matching `_CalendarGregorian`'s
+  pattern. Public DST policy enums. `RataDie.foundationEpoch = 730_486`.
+  45 tests in `Tests/CalendarFoundationTests/`: UTC, fixed-offset TZs,
+  LA spring/fall-back with `.former`/`.latter` policies, Sydney DST,
+  Berlin 1900, year ±10,000 to ±1,000,000, nanosecond precision profile,
+  end-of-day quirk documented. Full test suite: 383/384 (unchanged — only
+  failure is pre-existing Chinese 1906 cluster). Only Phase F (benchmarks
+  vs Foundation) remains on this plan.
+
+
 
 - 2026-04-17 — Project started. Agents mapped swift-foundation and
   ICU surfaces. `00-Overview.md`, `MigrationIssues.md`, and the four
