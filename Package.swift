@@ -109,5 +109,18 @@ let package = Package(
             dependencies: ["CalendarFoundation", "CalendarCore"],
             path: "Tests/CalendarFoundationTests"
         ),
+        .testTarget(
+            name: "ExtremeRangeTests",
+            dependencies: [
+                "CalendarCore",
+                "CalendarSimple",
+                "CalendarComplex",
+                "CalendarJapanese",
+                "CalendarAstronomical",
+                "CalendarHindu",
+                "AstronomicalEngine",
+            ],
+            path: "Tests/ExtremeRangeTests"
+        ),
     ]
 )

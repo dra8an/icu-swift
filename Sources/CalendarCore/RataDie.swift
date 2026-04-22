@@ -40,10 +40,17 @@ public struct RataDie: Sendable, Hashable {
         dayNumber - Self.unixEpoch.dayNumber
     }
 
-    /// The valid range for dates (~±999,999 ISO years).
+    /// The valid range for dates: ±365,000,000 days from R.D. 0 (~±999,999 ISO years).
     ///
     /// This matches ICU4X's range, which is guaranteed to be at least as large as
     /// the Temporal specification's validity range (±100,000,000 days from 1970-01-01).
+    ///
+    /// Temporal's limit is defined by the `CheckISODaysRange` abstract operation:
+    /// "If abs(ISODateToEpochDays(...)) > 10^8, throw a RangeError exception."
+    /// See <https://tc39.es/proposal-temporal/#sec-temporal-checkisodaysrange>.
+    ///
+    /// Note: this range is a documented contract, not a runtime-enforced check —
+    /// calendars assume RataDie inputs fall within it but do not validate.
     public static let validRange: ClosedRange<RataDie> = RataDie(-365_000_000)...RataDie(365_000_000)
 }
 

@@ -66,18 +66,20 @@ public enum HebrewArithmetic {
 
     /// Days elapsed from the Sunday noon before the Hebrew epoch to the molad of Tishrei.
     ///
-    /// Uses integer arithmetic. For the practical range of Hebrew years (≥ 1)
-    /// the intermediates are positive, so integer division equals floor division.
+    /// Uses integer arithmetic. Returns `Int64` because `days` scales as
+    /// ≈ 365 × year and exceeds Int32 at year ≈ ±5.88 M (corresponding to
+    /// RD ≈ ±2.15 × 10^9). Callers (`newYear`, `YearData`) already widen
+    /// to Int64 in their combine paths, so there's no narrowing penalty.
     @inlinable
-    static func calendarElapsedDays(_ year: Int32) -> Int32 {
+    static func calendarElapsedDays(_ year: Int32) -> Int64 {
         let monthsElapsed: Int64 = (235 &* Int64(year) &- 234) / 19
         let partsElapsed: Int64 = 12084 &+ 13753 &* monthsElapsed
         let days: Int64 = 29 &* monthsElapsed &+ partsElapsed / 25920
 
         if (3 &* (days &+ 1)).euclideanRemainder(7) < 3 {
-            return Int32(days &+ 1)
+            return days &+ 1
         } else {
-            return Int32(days)
+            return days
         }
     }
 
@@ -244,13 +246,32 @@ public enum HebrewArithmetic {
         return RataDie(totalDays)
     }
 
+    /// Floor division of Int64: always rounds toward negative infinity
+    /// (Swift's `/` truncates toward zero, which skews one off for negative
+    /// numerators). Used by the Hebrew year approximation.
+    @inlinable
+    static func floorDiv(_ a: Int64, _ b: Int64) -> Int64 {
+        if (a >= 0) == (b > 0) {
+            return a / b
+        } else {
+            return (a &- b &+ 1) / b
+        }
+    }
+
     /// Convert a fixed day number to a biblical Hebrew date.
     @inlinable
     public static func hebrewFromFixed(_ date: RataDie) -> (year: Int32, month: UInt8, day: UInt8) {
         // Approximate year using average Hebrew year length ≈ 365.2468.
         // Integer-math form of: date.dayNumber - epoch.dayNumber over 35975351/98496.
+        //
+        // Uses floor division so the approximation always errs LOW, never high.
+        // The linear `while newYear(year + 1) <= date` loop only walks forward,
+        // so a high-skewed `approx` at extreme negative RDs would leave `year`
+        // pinned past the true value and later produce a negative day-of-year
+        // remainder. Floor-div keeps `approx - 1` safely at or below the true
+        // year for all RDs in the Int32 year range.
         let dayDelta = Int64(date.dayNumber &- epochDayNumber)
-        let approx = Int32(1 &+ (dayDelta &* 98496) / 35975351)
+        let approx = Int32(1 &+ floorDiv(dayDelta &* 98496, 35975351))
 
         // Search forward for the exact year. Typically 0-2 iterations.
         var year = approx - 1

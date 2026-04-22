@@ -1,6 +1,6 @@
 # Test Coverage and Documentation Status
 
-*Last updated: 2026-04-16*
+*Last updated: 2026-04-22*
 
 This is the master index of per-calendar documentation and regression-test
 coverage. Update it whenever a new calendar doc, regression test, or
@@ -39,6 +39,18 @@ still rely only on hand-picked unit tests.
 | **Hindu Purnimanta** (lunisolar) | ✅ shared | – | ✅ 55,152 / 0 | built-in CSV |
 
 Legend: regression `✅ N / F` = N rows checked, F failures.
+
+## Cross-calendar extreme-range coverage
+
+`Tests/ExtremeRangeTests/ExtremeRataDieTests.swift` sweeps every pure-arithmetic calendar at `RataDie(±10_000_000_000)` (~±27 M years, ~27× past `RataDie.validRange`'s ±1 M-year contract). Purpose: prove `fromRataDie → toRataDie` round-trips at the endpoints without Int overflow — a sanity check that the Int64 arithmetic promise holds far beyond any realistic input. Astronomical calendars (Chinese, Dangi, Vietnamese, Hindu) are excluded because Moshier's precision envelope is only ~±3,000 years.
+
+**All 16 covered arithmetic calendars pass** at the ±10 B endpoints: ISO, Gregorian, Julian, Buddhist, ROC, Coptic, Ethiopian, Ethiopian Amete Alem, Persian, Indian, Hebrew, Japanese, and all 4 Islamic variants.
+
+Exercise also surfaced two real Hebrew bugs that only triggered at extreme RDs:
+1. A forward-only year search relied on truncating integer division, skewing the approximation one year high at large negative RDs and producing a negative day-of-year remainder. Fixed by introducing a `floorDiv` helper.
+2. `calendarElapsedDays` returned `Int32`, capping year at ~±5.88 M before the `days` intermediate overflowed. Widened to `Int64` (no public API change — callers already widened).
+
+Both fixes landed 2026-04-22. Hebrew regression (73,414 days vs Hebcal) remained zero-divergence.
 
 ## Coverage Gaps Worth Closing
 

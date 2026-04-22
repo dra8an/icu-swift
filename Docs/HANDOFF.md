@@ -18,6 +18,29 @@ Authoritative reference: `Docs-Foundation/SUBDAY_BOUNDARY.md`
 **§ Implementation**. That doc has full API signatures, DST algorithm,
 precision profile, and test inventory.
 
+**Extreme-range round-trip test + Hebrew fixes (2026-04-22).**
+Added `Tests/ExtremeRangeTests/` with a sweep verifying every
+pure-arithmetic calendar survives `RataDie(±10_000_000_000)` round-trip
+(~±27 M years, ~27× past `validRange`). All 16 pure-arithmetic calendars
+pass. Astronomical calendars (Chinese / Dangi / Vietnamese / Hindu)
+excluded — Moshier's ~±3 k-year precision envelope makes them
+unanswerable at that scale.
+
+Exercise surfaced two Hebrew bugs at extreme RDs, both fixed in
+`Sources/CalendarComplex/HebrewArithmetic.swift`:
+
+1. Truncating `/` in the year approximation inside `hebrewFromFixed`
+   skewed one year high at extreme negatives, producing a negative
+   day-of-year remainder and trapping a later `UInt8` init. Replaced
+   with a `floorDiv` helper.
+2. `calendarElapsedDays` returned `Int32`; the `days` intermediate
+   scales as ~365 × year and overflowed at year ≈ ±5.88 M. Widened
+   return type to `Int64`; callers already widened so no public API
+   change.
+
+Hebrew regression (73,414 days vs Hebcal, 1900–2100): still 0 divergences.
+Public `HebrewDateInner.year` remains `Int32` — not a breaking change.
+
 ## What is this project
 
 **icu4swift** is a Swift package — a library for world calendar

@@ -199,6 +199,24 @@ Regression test (`HebrewRegressionTests.swift`):
 
 - **73,414 daily conversions** vs Hebcal across 1900–2100, currently 0 failures.
 
+Extreme-range smoke test (`Tests/ExtremeRangeTests/`):
+
+- Round-trip at RD ±10,000,000,000 (~±27 M years). Passes as of
+  2026-04-22 after two internal fixes:
+  - `hebrewFromFixed` now uses a `floorDiv` helper instead of Swift's
+    truncating `/` for its year approximation. Previously, truncation
+    skewed the approximation one year high at extreme negative RDs,
+    leaving the forward-only search loop stranded past the true year
+    and producing a negative day-of-year remainder that later trapped
+    a `UInt8(rem + 1)` init.
+  - `calendarElapsedDays` return type widened from `Int32` to `Int64`.
+    The `days` intermediate scales as ~365 × year and previously
+    overflowed at year ≈ ±5.88 M. Callers already widened to Int64
+    before combining, so no public API change.
+- `HebrewDateInner.year` is still `Int32`, consistent with the other
+  calendars — 32-bit year width is ~±2.15 B years, comfortably past
+  any practical input.
+
 ## Source
 
 - ICU4X `calendrical_calculations/src/hebrew.rs` (Apache-2.0) — primary port
