@@ -243,6 +243,15 @@ Scope:
 - **Dependencies:** none.
 - **Unblocks:** identifier-coverage story in the pitch, Stage 3.
 
+~~### 18(a) — Round-trip stability (±10,000 years, every day)~~ *(done 2026-04-22)*
+
+Landed as `Tests/ExtremeRangeTests/RoundTripStabilityTests.swift`.
+7,305,216 days × 16 arithmetic calendars = **116,883,456 round-trips**,
+zero failures, ~1.1 s in release mode. Surfaced three Hebrew bugs (all
+floor-div vs truncating-div issues at negative years); all fixed.
+Options 18(b) R&D oracle and 18(c) Hebcal extension remain open if
+wanted.
+
 ### 18 — Extreme-range regression testing for arithmetic calendars
 Today's Hebrew regression runs 73,414 days (1900–2100) against
 Hebcal with zero divergences. Since Hebrew (and the other arithmetic

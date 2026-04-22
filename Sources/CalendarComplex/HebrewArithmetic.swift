@@ -70,11 +70,17 @@ public enum HebrewArithmetic {
     /// ≈ 365 × year and exceeds Int32 at year ≈ ±5.88 M (corresponding to
     /// RD ≈ ±2.15 × 10^9). Callers (`newYear`, `YearData`) already widen
     /// to Int64 in their combine paths, so there's no narrowing penalty.
+    ///
+    /// Uses `floorDiv` for the inner divisions because Swift's `/` truncates
+    /// toward zero, which disagrees with mathematical floor division by 1
+    /// for negative numerators. The algorithm (from R&D) assumes floor
+    /// division; truncation produces a ~29-day offset at negative years
+    /// (caught by the ±10,000-year round-trip stability test).
     @inlinable
     static func calendarElapsedDays(_ year: Int32) -> Int64 {
-        let monthsElapsed: Int64 = (235 &* Int64(year) &- 234) / 19
+        let monthsElapsed: Int64 = floorDiv(235 &* Int64(year) &- 234, 19)
         let partsElapsed: Int64 = 12084 &+ 13753 &* monthsElapsed
-        let days: Int64 = 29 &* monthsElapsed &+ partsElapsed / 25920
+        let days: Int64 = 29 &* monthsElapsed &+ floorDiv(partsElapsed, 25920)
 
         if (3 &* (days &+ 1)).euclideanRemainder(7) < 3 {
             return days &+ 1

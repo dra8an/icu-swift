@@ -199,23 +199,40 @@ Regression test (`HebrewRegressionTests.swift`):
 
 - **73,414 daily conversions** vs Hebcal across 1900–2100, currently 0 failures.
 
-Extreme-range smoke test (`Tests/ExtremeRangeTests/`):
+Extreme-range tests (`Tests/ExtremeRangeTests/`):
 
-- Round-trip at RD ±10,000,000,000 (~±27 M years). Passes as of
-  2026-04-22 after two internal fixes:
-  - `hebrewFromFixed` now uses a `floorDiv` helper instead of Swift's
-    truncating `/` for its year approximation. Previously, truncation
-    skewed the approximation one year high at extreme negative RDs,
-    leaving the forward-only search loop stranded past the true year
-    and producing a negative day-of-year remainder that later trapped
-    a `UInt8(rem + 1)` init.
-  - `calendarElapsedDays` return type widened from `Int32` to `Int64`.
-    The `days` intermediate scales as ~365 × year and previously
-    overflowed at year ≈ ±5.88 M. Callers already widened to Int64
-    before combining, so no public API change.
-- `HebrewDateInner.year` is still `Int32`, consistent with the other
-  calendars — 32-bit year width is ~±2.15 B years, comfortably past
-  any practical input.
+- **Two-point smoke test** at RD ±10,000,000,000 (~±27 M years):
+  passes as of 2026-04-22 after Int64 widening.
+- **Exhaustive ±10,000-year round-trip** (7,305,216 days, every day):
+  passes as of 2026-04-22 after three internal fixes. The exhaustive
+  test is what surfaced fix #3 (which the smoke test would never have
+  caught).
+
+All three fixes landed 2026-04-22, each caused by the same underlying
+issue — Swift's `/` truncates toward zero, but R&D's algorithms assume
+mathematical floor division. Each manifested at a different scale:
+
+1. **`hebrewFromFixed` year approximation.** `(dayDelta * 98496) / 35975351`
+   skewed one year high at extreme negatives, stranding the forward-only
+   search loop past the true year. Result: negative day-of-year remainder,
+   trapped a later `UInt8(rem + 1)` init at ~−365 M RD. Fix: route through
+   a `floorDiv` helper (new).
+2. **`calendarElapsedDays` return type.** Was `Int32`. Intermediate `days`
+   value scales as ~365 × year and overflowed Int32 at year ≈ ±5.88 M
+   (RD ~±2.15 B). Fix: widen return type to `Int64`. Callers already
+   widened to Int64 before combining, so no public API change.
+3. **`calendarElapsedDays` internal divisions.** `(235·year − 234) / 19`
+   and `partsElapsed / 25920` still used truncating `/`, producing a
+   ~29-day offset at negative years. Silent bug caught only by the
+   exhaustive ±10,000-year test (9,840 failures at year ≈ −6,223 and
+   below before the fix). Fix: floor-div on both.
+
+`HebrewDateInner.year` is still `Int32`, consistent with the other
+calendars — 32-bit year width is ~±2.15 B years, comfortably past any
+practical input. The three fixes above address internal arithmetic
+correctness at extreme negative RDs; none of them changes modern-range
+behaviour (73,414-day Hebcal regression stayed at 0/73,414 through all
+three fixes).
 
 ## Source
 

@@ -42,15 +42,21 @@ Legend: regression `✅ N / F` = N rows checked, F failures.
 
 ## Cross-calendar extreme-range coverage
 
-`Tests/ExtremeRangeTests/ExtremeRataDieTests.swift` sweeps every pure-arithmetic calendar at `RataDie(±10_000_000_000)` (~±27 M years, ~27× past `RataDie.validRange`'s ±1 M-year contract). Purpose: prove `fromRataDie → toRataDie` round-trips at the endpoints without Int overflow — a sanity check that the Int64 arithmetic promise holds far beyond any realistic input. Astronomical calendars (Chinese, Dangi, Vietnamese, Hindu) are excluded because Moshier's precision envelope is only ~±3,000 years.
+Two complementary exhaustive suites in `Tests/ExtremeRangeTests/`:
 
-**All 16 covered arithmetic calendars pass** at the ±10 B endpoints: ISO, Gregorian, Julian, Buddhist, ROC, Coptic, Ethiopian, Ethiopian Amete Alem, Persian, Indian, Hebrew, Japanese, and all 4 Islamic variants.
+**`ExtremeRataDieTests.swift`** — two-point smoke test at `RataDie(±10_000_000_000)` (~±27 M years, ~27× past `RataDie.validRange`). Proves `fromRataDie → toRataDie` doesn't overflow Int64 at endpoints. Astronomical calendars (Chinese, Dangi, Vietnamese, Hindu) excluded — Moshier's precision envelope is ~±3,000 years.
 
-Exercise also surfaced two real Hebrew bugs that only triggered at extreme RDs:
-1. A forward-only year search relied on truncating integer division, skewing the approximation one year high at large negative RDs and producing a negative day-of-year remainder. Fixed by introducing a `floorDiv` helper.
-2. `calendarElapsedDays` returned `Int32`, capping year at ~±5.88 M before the `days` intermediate overflowed. Widened to `Int64` (no public API change — callers already widened).
+**`RoundTripStabilityTests.swift`** (added 2026-04-22) — **every day** across ±10,000 ISO years (7,305,216 days × 16 arithmetic calendars = 116,883,456 round-trips), all zero-divergence, runs in ~1.1 s in release mode.
 
-Both fixes landed 2026-04-22. Hebrew regression (73,414 days vs Hebcal) remained zero-divergence.
+**All 16 covered arithmetic calendars pass both suites**: ISO, Gregorian, Julian, Buddhist, ROC, Coptic, Ethiopian, Ethiopian Amete Alem, Persian, Indian, Hebrew, Japanese, Islamic Civil, Islamic Tabular, Islamic Umm al-Qura (exercises both baked table and fallback to Islamic Civil), Islamic Astronomical.
+
+The extreme-range exercise surfaced **three Hebrew bugs** at negative RDs, all fixed 2026-04-22. Each was caused by Swift's `/` truncating toward zero where the R&D algorithms assume floor division, and each manifested at a different negative-RD scale:
+
+1. **`hebrewFromFixed` year approximation** — truncating division in the year estimate skewed one year high at extreme negatives, stranding the forward-only search loop past the true year and producing a negative day-of-year remainder that trapped a later `UInt8` init. Fixed by routing through a `floorDiv` helper. (Trap at ~−365 M RD.)
+2. **`calendarElapsedDays` return type** — `Int32`, but intermediate `days` scales as ~365 × year and overflowed Int32 at year ≈ ±5.88 M. Widened to `Int64`. (Trap at ~±2.2 B RD.)
+3. **`calendarElapsedDays` internal divisions** — `(235·year − 234) / 19` and `partsElapsed / 25920` still used truncating `/`, producing a ~29-day offset at year ≈ −6,223 and below. Fixed by floor-div on both. (Silent bug surfaced by the exhaustive ±10k-year test.)
+
+Hebrew 1900–2100 Hebcal regression (73,414 days) remained zero-divergence through all three fixes — modern-range behaviour was never affected.
 
 ## Coverage Gaps Worth Closing
 
