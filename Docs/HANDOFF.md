@@ -15,14 +15,31 @@ If the user asks to "work on calendar X" or "continue Stage 1," navigate to `/Us
 
 ## If you are resuming cold — read in this order
 
+### Direction and shape
+
 1. `Docs-Foundation/PORT_DIRECTION.md` — the authoritative direction decision
 2. `Docs-Foundation/FOUNDATION_APPLE.md` — Foundation repo orientation
 3. `Docs-Foundation/01-FoundationCalendarSurface.md` — `_CalendarProtocol` shape
 4. `Docs-Foundation/03-CoverageAndSemanticsGap.md` — the 11 primitives to implement
 5. `Docs-Foundation/04-icu4swiftGrowthPlan.md` — design principle
 6. `Docs-Foundation/06-FoundationPortPlan.md` — Stages 2–4 rollout
-7. `Docs-Foundation/SUBDAY_BOUNDARY.md` — sub-day boundary (use internal API inside Foundation)
-8. `Docs-Foundation/BENCHMARK_RESULTS.md` — perf narrative to validate
+
+### Sub-day / TZ handling
+
+7. `Docs-Foundation/SUBDAY_BOUNDARY.md` — sub-day boundary design. **Note:** inside Foundation, call the internal `TimeZone.rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:skippedTimePolicy:)` directly; the 2-probe workaround in `CalendarFoundation` is obsolete and that module is being deleted.
+
+### Per-calendar specifics (read before porting each calendar)
+
+8. `Docs/TestCoverageAndDocs.md` — master index. For each calendar: points at per-calendar spec doc, regression dataset, row counts, reference source.
+9. For each calendar you port, read `Docs/<Calendar>.md` if it exists — captures non-obvious bugs and design decisions. **Hebrew has three fix notes that must survive the port** (floor-div for year approximation, Int64 widening of `calendarElapsedDays`, floor-div on inner divisions). Coptic/Ethiopian/Islamic/Chinese/Hindu each have their own reference docs.
+10. `Docs/RDvsJD.md` — why RataDie (not Julian Day) is the pivot. Keep this convention in Foundation.
+11. `Docs/BakedDataStrategy.md` — how Chinese / UQ / Hindu-solar baked tables work.
+
+### Perf / validation narrative
+
+12. `Docs-Foundation/BENCHMARK_RESULTS.md` — the perf narrative to validate inside Foundation.
+13. `Docs-Foundation/AdapterPerfInvestigation.md` — why the adapter's 2-probe tax doesn't apply inside Foundation.
+14. `Docs-Foundation/05-PerformanceParityGate.md` — the gate every Stage 3 PR must pass.
 
 ---
 
