@@ -1,13 +1,37 @@
 # Foundation Calendar Port — Next
 
-*Last updated 2026-04-19 PM (session end). Single focused next task.
+> **⚠ 2026-04-22 evening: icu4swift frozen. Port moved to public `swift-foundation`.**
+> See `PORT_DIRECTION.md`. All new "next task" tracking happens inside
+> swift-foundation, not here. The single-next-task box below is FROZEN
+> and no longer applicable.
+
+## The single next task
+
+**Resume at:** `/Users/draganbesevic/Projects/claude/swift-foundation`.
+
+**First step:** set up a working area for our calendar backends. Port one
+calendar end-to-end (Gregorian-family or Hebrew — either works) as a
+`_CalendarProtocol` conformance inside swift-foundation. Wire it into
+`CalendarCache._calendarClass(identifier:)` behind a build flag. Run
+Foundation's own test suite against it.
+
+Detailed shape in `PORT_DIRECTION.md`. Reference reading order listed
+in `Docs/HANDOFF.md` top banner.
+
+---
+
+*Pre-freeze content below (kept for historical reference).*
+
+---
+
+*Originally last updated 2026-04-19 PM (session end). Single focused next task.
 Pulls from `PIPELINE.md`.*
 
 **Updated only at session end.** This file holds the one task to
 pick up when resuming work. Do not update during the session —
 track in-flight progress in `PIPELINE.md` instead.
 
-## The single next task
+## The single next task (pre-freeze, superseded)
 
 ### Direct ICU4C benchmark for apples-to-apples comparison
 *(pipeline item 17)*

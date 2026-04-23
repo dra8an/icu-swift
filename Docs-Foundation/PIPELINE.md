@@ -1,11 +1,15 @@
 # Foundation Calendar Port — Pipeline
 
-*Last updated 2026-04-19. Unordered list of work items in the hopper;
-**prioritize by rearranging, then pull the top item into `NEXT.md`.***
+> **⚠ 2026-04-22 evening: icu4swift frozen. Port moved to public `swift-foundation`.**
+> See `PORT_DIRECTION.md`. This pipeline is now a **historical record**
+> of what was queued when the move happened. Ongoing pipeline management
+> happens inside swift-foundation.
 
-This doc is the full pipeline of candidate tasks. `NEXT.md` is the
-single focused next task. `PROJECT_PLAN.md` is the permanent
-stage-level roadmap. `STATUS.md` is the current state snapshot.
+*Last updated 2026-04-22 evening (final pre-freeze update).*
+
+This doc is the full pipeline of candidate tasks at the moment of the
+move. Any items still open below should be re-triaged inside
+swift-foundation in the new work tracker there.
 
 **Update cadence.** This doc is updated **freely during a session**
 — strike through / remove completed items, add new candidates at

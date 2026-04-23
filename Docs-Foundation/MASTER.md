@@ -1,6 +1,11 @@
 # Docs-Foundation — Master Index
 
-*Last updated 2026-04-17.*
+> **⚠ 2026-04-22 evening: icu4swift frozen. Port moved to public `swift-foundation`.**
+> See **[`PORT_DIRECTION.md`](PORT_DIRECTION.md)** — the authoritative
+> decision record. The documents below remain as historical / reference
+> material. Continuing docs live inside swift-foundation.
+
+*Last updated 2026-04-22 evening (final pre-freeze update).*
 
 This directory contains all planning, design, and tracking documents for
 the effort to integrate `icu4swift`'s calendar algorithms into
@@ -20,6 +25,7 @@ Read-and-update throughout the project. Keep them current.
 
 | File | Purpose |
 |---|---|
+| **`PORT_DIRECTION.md`** | **⚠ READ FIRST.** The authoritative direction decision (2026-04-22): all port work moves to public `swift-foundation`; icu4swift is frozen. Everything below is historical context for how we got to that decision. |
 | **`MASTER.md`** | This file — index of every document here and what it is for. |
 | **`PROJECT_PLAN.md`** | High-level roadmap: the four stages of the port, phases within each, and acceptance criteria. The answer to "what are we doing and in what order". |
 | **`STATUS.md`** | Current state: which docs exist, which calendars are ported, which perf baselines are captured, what is in flight vs. complete. Updated at each checkpoint. |

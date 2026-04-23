@@ -1,6 +1,11 @@
 # Foundation Calendar Port — Status
 
-*Last updated 2026-04-20. Update this file at every checkpoint.*
+> **⚠ 2026-04-22 evening: icu4swift frozen. Port moved to public `swift-foundation`.**
+> See `PORT_DIRECTION.md` for the decision. Status updates from this point
+> forward happen inside swift-foundation, not here. Content below documents
+> the state at the moment of the move.
+
+*Last updated 2026-04-22. Update this file at every checkpoint.*
 
 One-page snapshot of where the project stands. For the roadmap see
 `PROJECT_PLAN.md`; for immediate next steps see `NEXT.md`.

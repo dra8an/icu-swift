@@ -1,7 +1,39 @@
 # icu4swift — Session Handoff
 
-*Written 2026-04-20. Updated 2026-04-22 with CalendarFoundation adapter
-landing. Consult this first when resuming work on this project.*
+# ⚠ REPO IS FROZEN — WORK HAS MOVED ⚠
+
+**All calendar port work now happens in the public `swift-foundation` clone at `/Users/draganbesevic/Projects/claude/swift-foundation`. This `icu4swift` repository is archived.**
+
+**Decision record:** `Docs-Foundation/PORT_DIRECTION.md` (READ THIS FIRST if resuming cold).
+
+**Do not make code changes in this repository.** The only acceptable edits here are:
+1. Updating `PORT_DIRECTION.md` itself.
+2. Updating this banner or `README.md` for clarity.
+3. Final freeze commits before user tags the repo.
+
+If the user asks to "work on calendar X" or "continue Stage 1," navigate to `/Users/draganbesevic/Projects/claude/swift-foundation` and start there. Not here.
+
+## If you are resuming cold — read in this order
+
+1. `Docs-Foundation/PORT_DIRECTION.md` — the authoritative direction decision
+2. `Docs-Foundation/FOUNDATION_APPLE.md` — Foundation repo orientation
+3. `Docs-Foundation/01-FoundationCalendarSurface.md` — `_CalendarProtocol` shape
+4. `Docs-Foundation/03-CoverageAndSemanticsGap.md` — the 11 primitives to implement
+5. `Docs-Foundation/04-icu4swiftGrowthPlan.md` — design principle
+6. `Docs-Foundation/06-FoundationPortPlan.md` — Stages 2–4 rollout
+7. `Docs-Foundation/SUBDAY_BOUNDARY.md` — sub-day boundary (use internal API inside Foundation)
+8. `Docs-Foundation/BENCHMARK_RESULTS.md` — perf narrative to validate
+
+---
+
+*Everything below this line is historical reference documenting how the
+project got here. Read only for context; it describes work that
+happened in this repo before the move.*
+
+---
+
+*Originally written 2026-04-20. Updated 2026-04-22 with CalendarFoundation adapter
+landing, then superseded 2026-04-22 evening by `PORT_DIRECTION.md`.*
 
 ## Most recent work (2026-04-22)
 

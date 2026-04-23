@@ -1,6 +1,14 @@
 # icu4swift
 
+> **⚠ Archived — this repository is frozen.**
+> All continuing work on pure-Swift calendar implementations happens in
+> [`swift-foundation`](https://github.com/swiftlang/swift-foundation),
+> directly replacing `_CalendarICU` inside Foundation per identifier.
+> See `Docs-Foundation/PORT_DIRECTION.md` for the decision record.
+
 A type-safe, pure-Swift calendar library ported from [ICU4X](https://github.com/unicode-org/icu4x) (Rust) and [ICU4C](https://unicode-org.github.io/icu/) (C++). Covers **all 28 `Foundation.Calendar.Identifier` cases** with a modern Swift 6 API, strict concurrency, and zero dependencies.
+
+Developed 2025–2026 as the staging ground for a Foundation calendar rewrite. Code, tests, benchmarks, and reference data all move into swift-foundation as the port progresses. This repo remains as the historical record of how the algorithms and perf narrative were developed.
 
 ## Status
 
