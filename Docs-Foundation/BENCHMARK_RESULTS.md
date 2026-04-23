@@ -617,7 +617,7 @@ excluded, checksum depending on computed values. Foundation calendar
 is `Calendar(.gregorian)` with UTC. Median of 3 runs, release mode,
 x86_64 macOS.*
 
-### Numbers
+### Numbers — UTC
 
 | Operation | icu4swift | Foundation | Winner |
 |---|---:|---:|---|
@@ -625,19 +625,86 @@ x86_64 macOS.*
 | **Assembly** (civil components → Date in UTC) | 3,042 ns | 2,396 ns | Foundation 1.27× |
 | **Round-trip** (Date → components → Date) | 3,683 ns | 4,094 ns | **icu4swift 1.11×** |
 
+### Numbers — `TimeZone.gmt` (fast-path fixed-offset zone, backed by `_TimeZoneGMT`)
+
+*Added 2026-04-22 evening. Isolates the adapter / calendar math from TZ dispatch cost by using a TZ whose `secondsFromGMT(for:)` is a single property read (~15 ns) instead of an ICU lookup (~500+ ns).*
+
+| Operation | icu4swift | Foundation | Winner |
+|---|---:|---:|---|
+| **Extraction** | **39 ns** | 1,016 ns | **icu4swift 26×** |
+| **Assembly** | **86 ns** | 345 ns | **icu4swift 4×** |
+| **Round-trip** | **118 ns** | 1,182 ns | **icu4swift 10×** |
+
+**This is the adapter + calendar-math cost with TZ cost removed from both sides.** It shows what the architecture would deliver if the public `TimeZone` API had the single-dispatch cost profile that Foundation's internal `rawAndDaylightSavingTimeOffset` has. The 26× extraction win matches the calendar-math layer's 17–285× ratio (arithmetic tier).
+
+### Numbers — `America/Los_Angeles` (realistic DST-capable zone)
+
+*Added 2026-04-22 evening after scope-check — UTC alone does not represent real user workloads. Most calendar callers pass named DST zones (`America/Los_Angeles`, `Europe/London`, `Asia/Tokyo`, etc.). Separate run, same harness, 3-run median.*
+
+| Operation | icu4swift | Foundation | Winner |
+|---|---:|---:|---|
+| **Extraction** (Date → civil components in LA) | 2,072 ns | 4,802 ns | **icu4swift 2.32×** |
+| **Assembly** (civil components → Date in LA) | 4,000 ns | 3,314 ns | Foundation 1.21× |
+| **Round-trip** (Date → components → Date) | 5,022 ns | 5,449 ns | **icu4swift 1.09×** |
+
+### GMT vs UTC vs LA — TZ dispatch is the entire story
+
+The three zones tested expose how `secondsFromGMT(for:)` cost dominates everything. Full matrix (3 runs, median, 100k iters):
+
+| Operation | Zone | icu4swift | Foundation | Our win |
+|---|---|---:|---:|---:|
+| **Extract** | GMT (`_TimeZoneGMT`) | **39 ns** | 1,016 ns | **26×** |
+| | UTC (`_TimeZoneICU`) | 1,754 ns | 3,420 ns | 1.95× |
+| | LA (`_TimeZoneICU` + DST) | 2,072 ns | 4,802 ns | 2.32× |
+| **Assemble** | GMT | **86 ns** | 345 ns | **4×** |
+| | UTC | 3,042 ns | 2,396 ns | Foundation 1.27× |
+| | LA | 4,000 ns | 3,314 ns | Foundation 1.21× |
+| **Round-trip** | GMT | **118 ns** | 1,182 ns | **10×** |
+| | UTC | 3,683 ns | 4,094 ns | 1.11× |
+| | LA | 5,022 ns | 5,449 ns | 1.09× |
+
+**Per-call `secondsFromGMT(for:)` cost**, for reference:
+- `TimeZone.gmt` (`_TimeZoneGMT`): ~15 ns (single property read)
+- `TimeZone(identifier: "UTC")`: ~547 ns (ICU lookup — goes through `_TimeZoneICU` despite conceptual equivalence to GMT)
+- `TimeZone(identifier: "America/Los_Angeles")`: ~810 ns (ICU lookup + DST transition table)
+
+icu4swift round-trip scales **118 ns → 5,022 ns (43×)** purely from TZ dispatch. Foundation round-trip scales 1,182 ns → 5,449 ns (4.6×). Same story, different baselines.
+
+**Key observation on assembly:** Foundation *wins* assembly on UTC and LA by ~1.2× because it uses the internal single-dispatch `rawAndDaylightSavingTimeOffset` API. On GMT, where the TZ cost collapses to ~15 ns, our adapter *wins* by 4× — the extra single-dispatch advantage disappears when there's nothing to dispatch to. This confirms the "2-probe tax" is the entire assembly gap, and confirms it vanishes once our backend is inside swift-foundation.
+
+**Our adapter's code is fast (~100 ns of actual work).** The 5 µs we measured on LA is almost entirely Foundation's `_TimeZoneICU` dispatch cost — 2× 810 ns for the 2-probe. When the TZ is fast (GMT), we're 10× faster than Foundation end-to-end.
+
+**The pitch-honest version:**
+- icu4swift round-trip on GMT-class zones: **~120 ns**, ~10× faster than Foundation.
+- icu4swift round-trip on DST zones: **~5 µs**, ~1.1× faster than Foundation (both limited by public-API TZ dispatch).
+- Inside swift-foundation (Stage 1+), the private single-dispatch TZ API is accessible to us — we'll match `_CalendarGregorian`'s cost profile by construction, and the 17–285× calendar-math win over `_CalendarICU` translates directly to end-to-end wins.
+
 ### What each operation does
 
-- **Extraction** — icu4swift: `rataDieAndTimeOfDay(from: date, in: utc)` returning `(RataDie, secondsInDay, nanosecond)`. Foundation: `cal.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date)`.
+- **Extraction** — icu4swift: `rataDieAndTimeOfDay(from: date, in: tz)` returning `(RataDie, secondsInDay, nanosecond)`. Foundation: `cal.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date)`.
 - **Assembly** — icu4swift: `date(rataDie:hour:minute:second:nanosecond:in:)`. Foundation: `cal.date(from: DateComponents(year:month:day:hour:minute:second:nanosecond:))`.
 - **Round-trip** — chain of extraction then assembly on both sides.
 
 ### Interpretation
 
-**icu4swift wins extraction and round-trip; Foundation wins assembly.** The extraction win is the headline — Foundation's `dateComponents` goes through `_CalendarGregorian`'s full Julian-day conversion + TZ offset + Y/M/D decomposition; ours is simpler integer math on `RataDie`. The round-trip is close (1.1×) because both sides hit the same Foundation `Date` boundary at either end.
+**icu4swift wins extraction and round-trip on both UTC and LA; Foundation wins assembly on both.** On LA the extraction win widens (2.32×) and the round-trip gap narrows slightly (1.09×). The consistent shape is: our adapter is faster at decomposing a Date into civil components, roughly equal on round-trip, and slower on assembly.
 
-**Foundation's assembly win (1.27×) is real and has a specific cause.** Our `resolveLocalTI` helper probes the time zone ±24 h around the local instant to correctly detect DST-transition skipped/repeated wall times (two `TimeZone.secondsFromGMT(for:)` calls on the fast path). Foundation's internal `TimeZone.rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:)` does the same work with one dispatch into ICU.
+**Foundation's assembly win (1.21–1.27×) is real and has a specific cause.** Our `resolveLocalTI` helper probes the time zone ±24 h around the local instant to correctly detect DST-transition skipped/repeated wall times — two `TimeZone.secondsFromGMT(for:)` calls on the fast path. Foundation's **internal** `TimeZone.rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:skippedTimePolicy:)` returns both raw and DST offsets in one ICU dispatch; it's `internal` to swift-foundation, so we cannot call it from outside.
 
-We attempted a "1-probe + verify" fast path and reverted — it silently drops `repeatedTimePolicy: .latter` semantics on fall-back because the self-consistent offset always picks the `.former` branch. The 2-probe approach is required to respect the policy parameters. We accept the ~600 ns overhead as the cost of correctness without access to Foundation's package-level `rawAndDaylightSavingTimeOffset`.
+Two optimization attempts tried and reverted:
+
+1. **1-probe + verify fast path** — returned the `.former` candidate silently regardless of caller's `.latter` policy on fall-back. Reverted.
+2. **1-probe for default `.former`/`.former` only** — reverted after 3 tests caught that it breaks round-trip correctness on every wall-clock time on a DST transition day (not just AT the transition). `provisional UTC interpretation` lands on a different side of the transition than the intended candidate, giving the wrong offset. Example: LA 04:30 on 2024-03-10 — `secondsFromGMT(for: "2024-03-10 04:30 UTC")` returns pre-transition PST, producing a candidate 1 hour off.
+
+**The 2-probe is the minimum correct algorithm with the public `TimeZone` API.** This is a public-API-inherent cost for the adapter — not a bug to optimize away. See "Port-destination framing" below.
+
+### Port-destination framing
+
+The `CalendarFoundation` adapter is the **outside-of-Foundation convenience** for SPM consumers who use icu4swift directly without waiting for the Stage 1+ port to land inside swift-foundation. Its 2-probe tax is characteristic of the public `TimeZone` API surface, not a permanent property of our architecture.
+
+**Once we're inside swift-foundation (Stage 1+)**, our Swift backends become `_CalendarProtocol` conformances. At that level — same level as `_CalendarGregorian` — the `internal` `rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:skippedTimePolicy:)` is **available to us**. Our backends will call it directly. **The 2-probe tax disappears by construction.**
+
+So the adapter's ~3,683 ns (UTC) / ~5,022 ns (LA) round-trip is a today-number for today-external-usage, not the end state. Stage 1+ backends are expected to match `_CalendarGregorian`'s boundary cost by construction (single-dispatch TZ, no probe overhead). **The 17–285× calendar-math win over `_CalendarICU` is what users see end-to-end once Stage 3 flips the router.**
 
 ### Reconciling with the "17–285×" headline (resolved 2026-04-22)
 

@@ -161,6 +161,187 @@ struct FoundationAdapterBenchmarks {
         }
     }
 
+    // MARK: - Fast-path TimeZone — GMT (via TimeZone.gmt)
+
+    // `TimeZone.gmt` is backed by `_TimeZoneGMT`, whose `secondsFromGMT(for:)`
+    // is a single property read (~15 ns). Compare to `TimeZone(identifier: "UTC")`
+    // benchmarks above — those appear to be == TimeZone.gmt by identifier
+    // (both report "GMT") but in practice test-target builds hit ICU lookup
+    // machinery somewhere and measure slower. Establishing the true fast-path
+    // TimeZone baseline separates TZ-layer cost from adapter cost.
+
+    static let gmtTZ = TimeZone.gmt
+    static let foundationCalGMT: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = gmtTZ
+        return c
+    }()
+
+    @Test("GMT: Extract — icu4swift rataDieAndTimeOfDay")
+    func gmtExtractIcu() {
+        let tz = Self.gmtTZ
+        runBench("GMT icu4swift extract") { i in
+            let d = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.0 * 3_600)
+            let (rd, sec, ns) = rataDieAndTimeOfDay(from: d, in: tz)
+            return rd.dayNumber ^ Int64(sec) ^ Int64(ns)
+        }
+    }
+
+    @Test("GMT: Extract — Foundation dateComponents")
+    func gmtExtractFoundation() {
+        let cal = Self.foundationCalGMT
+        runBench("GMT Foundation extract") { i in
+            let d = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.0 * 3_600)
+            let dc = cal.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: d)
+            return Int64(dc.year ?? 0) ^ Int64(dc.month ?? 0) ^ Int64(dc.day ?? 0)
+                ^ Int64(dc.hour ?? 0) ^ Int64(dc.minute ?? 0) ^ Int64(dc.second ?? 0)
+                ^ Int64(dc.nanosecond ?? 0)
+        }
+    }
+
+    @Test("GMT: Assemble — icu4swift date(rataDie:...)")
+    func gmtAssembleIcu() {
+        let tz = Self.gmtTZ
+        let baseRD = Self.baseRD
+        runBench("GMT icu4swift assemble") { i in
+            let rd = RataDie(baseRD.dayNumber + Int64(i % 1000))
+            let d = date(rataDie: rd, hour: 12, minute: 30, second: 15, nanosecond: 123_456_789, in: tz)
+            return Int64(d.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("GMT: Assemble — Foundation date(from:)")
+    func gmtAssembleFoundation() {
+        let cal = Self.foundationCalGMT
+        runBench("GMT Foundation assemble") { i in
+            let day = 1 + (i % 28)
+            let month = 1 + ((i / 28) % 12)
+            let year = 2024 + (i / (28 * 12))
+            let dc = DateComponents(year: year, month: month, day: day,
+                                     hour: 12, minute: 30, second: 15, nanosecond: 123_456_789)
+            guard let d = cal.date(from: dc) else { return 0 }
+            return Int64(d.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("GMT: Round-trip — icu4swift")
+    func gmtRoundTripIcu() {
+        let tz = Self.gmtTZ
+        runBench("GMT icu4swift round-trip") { i in
+            let input = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.5 * 3_600)
+            let (rd, sec, ns) = rataDieAndTimeOfDay(from: input, in: tz)
+            let hour = sec / 3600
+            let minute = (sec % 3600) / 60
+            let second = sec % 60
+            let output = date(rataDie: rd, hour: hour, minute: minute, second: second, nanosecond: ns, in: tz)
+            return Int64(output.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("GMT: Round-trip — Foundation")
+    func gmtRoundTripFoundation() {
+        let cal = Self.foundationCalGMT
+        runBench("GMT Foundation round-trip") { i in
+            let input = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.5 * 3_600)
+            let dc = cal.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: input)
+            guard let output = cal.date(from: dc) else { return 0 }
+            return Int64(output.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    // MARK: - Realistic (DST) TimeZone — America/Los_Angeles
+
+    static let laTZ = TimeZone(identifier: "America/Los_Angeles")!
+    static let foundationCalLA: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = laTZ
+        return c
+    }()
+
+    @Test("LA: Extract — icu4swift rataDieAndTimeOfDay")
+    func laExtractIcu() {
+        let tz = Self.laTZ
+        runBench("LA icu4swift extract") { i in
+            let d = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.0 * 3_600)
+            let (rd, sec, ns) = rataDieAndTimeOfDay(from: d, in: tz)
+            return rd.dayNumber ^ Int64(sec) ^ Int64(ns)
+        }
+    }
+
+    @Test("LA: Extract — Foundation dateComponents")
+    func laExtractFoundation() {
+        let cal = Self.foundationCalLA
+        runBench("LA Foundation extract") { i in
+            let d = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.0 * 3_600)
+            let dc = cal.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: d)
+            return Int64(dc.year ?? 0) ^ Int64(dc.month ?? 0) ^ Int64(dc.day ?? 0)
+                ^ Int64(dc.hour ?? 0) ^ Int64(dc.minute ?? 0) ^ Int64(dc.second ?? 0)
+                ^ Int64(dc.nanosecond ?? 0)
+        }
+    }
+
+    @Test("LA: Assemble — icu4swift date(rataDie:...)")
+    func laAssembleIcu() {
+        let tz = Self.laTZ
+        let baseRD = Self.baseRD
+        runBench("LA icu4swift assemble") { i in
+            let rd = RataDie(baseRD.dayNumber + Int64(i % 1000))
+            let d = date(rataDie: rd, hour: 12, minute: 30, second: 15, nanosecond: 123_456_789, in: tz)
+            return Int64(d.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("LA: Assemble — Foundation date(from:)")
+    func laAssembleFoundation() {
+        let cal = Self.foundationCalLA
+        runBench("LA Foundation assemble") { i in
+            let day = 1 + (i % 28)
+            let month = 1 + ((i / 28) % 12)
+            let year = 2024 + (i / (28 * 12))
+            let dc = DateComponents(year: year, month: month, day: day,
+                                     hour: 12, minute: 30, second: 15, nanosecond: 123_456_789)
+            guard let d = cal.date(from: dc) else { return 0 }
+            return Int64(d.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("LA: Round-trip — icu4swift")
+    func laRoundTripIcu() {
+        let tz = Self.laTZ
+        runBench("LA icu4swift round-trip") { i in
+            let input = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.5 * 3_600)
+            let (rd, sec, ns) = rataDieAndTimeOfDay(from: input, in: tz)
+            let hour = sec / 3600
+            let minute = (sec % 3600) / 60
+            let second = sec % 60
+            let output = date(rataDie: rd, hour: hour, minute: minute, second: second, nanosecond: ns, in: tz)
+            return Int64(output.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
+    @Test("LA: Round-trip — Foundation")
+    func laRoundTripFoundation() {
+        let cal = Self.foundationCalLA
+        runBench("LA Foundation round-trip") { i in
+            let input = Date(timeIntervalSinceReferenceDate:
+                Self.baseTI + Double(i % 1000) * 86_400 + 12.5 * 3_600)
+            let dc = cal.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: input)
+            guard let output = cal.date(from: dc) else { return 0 }
+            return Int64(output.timeIntervalSinceReferenceDate * 1e6)
+        }
+    }
+
     // MARK: - Apples-to-apples: both sides produce/consume Y/M/D/h/m/s/ns
 
     // Tracked in Docs-Foundation/AdapterPerfInvestigation.md § Slice 2.

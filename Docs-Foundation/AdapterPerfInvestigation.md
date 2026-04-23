@@ -417,33 +417,74 @@ calendar-math gap actually lands in a user-visible way.
 item 9). Not an "adapter improvement" per se — it's the
 architectural answer. Don't conflate.
 
+### Key reframing (2026-04-22 evening)
+
+The earlier sections treated the adapter as the artifact to
+optimize. That is backwards once you account for the port's
+destination: **our Swift backends become part of `swift-foundation`
+itself** (Stage 1+). Inside swift-foundation:
+
+- The `internal` API `TimeZone.rawAndDaylightSavingTimeOffset(for:repeatedTimePolicy:skippedTimePolicy:)`
+  is **accessible to us**, same as it is to `_CalendarGregorian`.
+- Our backend calls that single-dispatch API directly.
+- The 2-probe workaround isn't needed — same code shape as
+  `_CalendarGregorian` uses today.
+- No public-API tax. No 700 ns overhead. Matches Foundation's own
+  boundary cost by construction.
+
+**The `CalendarFoundation` adapter's purpose is different from
+what I was optimizing it for.** It's the **outside-of-Foundation
+convenience** for SPM consumers who use icu4swift directly without
+waiting for the port to land. Its 2-probe cost is inherent to
+being outside Foundation's internal API — a characteristic of the
+public surface, not a bug to optimize away.
+
+**What this means for pitch framing:**
+
+- **Adapter numbers** (~3.9 µs round-trip today) are the
+  "outside-consumer" story. Useful as a data point but not the
+  perf headline.
+- **Stage 1+ numbers** (expected ≈ `_CalendarGregorian` parity —
+  ~1–2 µs round-trip matching Foundation's own pure-Swift
+  backend) are the real target. They don't exist yet because we
+  haven't written the Stage 1 primitives.
+- **Calendar math** (17–285× faster than ICU4C at that layer)
+  remains the underlying engine win. Stage 1+ exposes it by
+  replacing `_CalendarICU`.
+
 ### Bundled recommendations
 
-*(Updated 2026-04-22 after Ideas 2 and 3 both turned out marginal.)*
+*(Updated 2026-04-22 evening after refocusing on port-destination.)*
 
-- **"Cheap wins" are actually capped at noise floor.** Two
-  hypotheses tried; both expected 100–700 ns but both delivered
-  results indistinguishable from zero in the ~100–200 ns bench
-  noise. The accessible cost budget in our adapter is so thin
-  that small optimizations disappear.
-- **Meaningful UTC win (~2 h)**: Idea 1 — fixed-offset detection
-  short-circuit. Expected ~1,000 ns saved by skipping the 2-probe
-  TZ dance for UTC / fixed-offset zones. This is the only idea
-  still likely to show above noise, because the TZ calls are the
-  single largest measurable cost (~550 ns each).
-- **Exogenous ask**: Idea 4 — file the swift-foundation issue even
-  if we don't pursue it ourselves. Doc trail matters for the pitch.
-- **Don't conflate with Stage 1**: Idea 5 is the real win, but
-  it's the architectural plan, not an adapter patch. Stage 1 lands
-  the whole point.
+**The adapter has an inherent 2-probe tax** from the public
+`TimeZone` API. That tax disappears when we're inside
+swift-foundation (Stage 1+). Until then, the adapter's ~3.9 µs
+round-trip on DST zones is what it is.
 
-**Lesson from tries.** Micro-optimizations below ~300 ns are not
-provable in this bench harness because Foundation's TZ-layer
-variance is ~100–200 ns. Only optimizations that save ≥ ~500 ns
-at once can be demonstrated. Idea 1 meets that bar (skipping ~1 µs
-of TZ work); Ideas 2 and 3 did not.
+**Attempts to optimize this from outside:**
 
-When next touched, go directly to **Idea 1** or move on to Stage 1.
+| Idea | Result |
+|---|---|
+| 1. Fixed-offset short-circuit (UTC / fixed zones only) | Helps UTC/fixed callers only. Realistic use is DST zones, so effect is narrow. |
+| 2. `@inlinable` | Applied. Marginal. |
+| 3. `ns == 0` elision | Tried, reverted — Double division below noise floor. |
+| Single-probe fast path for `.former` | **Tried, reverted** — breaks round-trip correctness on every wall time on a DST-transition day. |
+| 4. Ask swift-foundation to promote `rawAndDaylightSavingTimeOffset` to public | Exogenous ask. Would save ~800 ns for all external consumers. |
+| 5. Stage 1 `_CalendarProtocol` conformance (= the port) | **The real answer.** Inside Foundation, internal API available. |
+
+**What to do:**
+- **Stop optimizing the adapter.** Its 2-probe cost is inherent
+  to the public `TimeZone` API surface. File Idea 4 (exogenous)
+  if we want the tax lifted for all external consumers.
+- **Move to Stage 1** (pipeline item 9). That's where the perf
+  story actually lands for users who go through `Calendar(.hebrew)`
+  etc. The adapter remains useful for SPM-direct consumers, with
+  its documented cost profile.
+
+**Lesson.** I was optimizing the adapter as if it were the permanent
+end state. It isn't — it's the outside-Foundation convenience. The
+Stage 1 backends inside Foundation don't carry the 2-probe tax
+because they can call the internal API directly.
 
 ## See also
 

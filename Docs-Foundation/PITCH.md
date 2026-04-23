@@ -84,16 +84,26 @@ for a Foundation engineer:
    require it, and we don't pay for it.
 
    **Scoping:** this is the calendar-math layer, *below* the
-   Foundation.Date + TimeZone public-API dispatch. An end-to-end
-   apples-to-apples Gregorian round-trip (Date → Y/M/D/h/m/s/ns →
-   Date in UTC, full public-API stack on both sides) is **1.5–2×
-   faster** on arithmetic calendars and **5–7× faster** on Chinese —
-   the boundary tax hides most of the calendar-math gap from a
-   direct user. But that tax **goes away** when we wire our backend
-   into `_CalendarProtocol` and share TimeZone state with Calendar
-   the way `_CalendarICU` does today. That's when the 10–40× /
-   1,000× math-speed advantage translates directly into wrapper-
-   inclusive end-to-end wins."
+   Foundation.Date + TimeZone public-API dispatch. Three-zone
+   end-to-end Gregorian round-trip (Date → Y/M/D/h/m/s/ns →
+   Date), full public-API stack both sides:
+
+   | Zone | icu4swift | Foundation | Ratio |
+   |---|---:|---:|---:|
+   | `TimeZone.gmt` (fast-path) | **118 ns** | 1,182 ns | **10×** |
+   | `TimeZone(identifier: \"UTC\")` | 3,683 ns | 4,094 ns | 1.11× |
+   | `America/Los_Angeles` (DST) | 5,022 ns | 5,449 ns | 1.09× |
+
+   The difference is 100% TimeZone dispatch cost, not calendar
+   math. `secondsFromGMT(for:)` costs ~15 ns on `_TimeZoneGMT`
+   but ~547–810 ns on `_TimeZoneICU`, and we make two calls per
+   assembly to detect DST transitions safely. Foundation's
+   **internal** `TimeZone.rawAndDaylightSavingTimeOffset(for:)`
+   does both in one call — but it's `internal` to swift-foundation,
+   so outside consumers can't reach it. **Inside** swift-foundation
+   our backend calls it directly, same as `_CalendarGregorian`
+   does today — the 2-probe tax disappears, and the 10× fast-path
+   win applies to every zone."
 
    See `BENCHMARK_RESULTS.md` for the full tables (calendar-math,
    end-to-end apples-to-apples, three-way with ICU4C direct). See

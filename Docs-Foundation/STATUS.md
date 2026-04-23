@@ -128,10 +128,25 @@ is resolving Issue 4 (measure Gregorian pure-Swift vs. ICU perf)
   policy correctness), round-trip **icu4swift 1.11× faster**. Recorded
   in `BENCHMARK_RESULTS.md § Sub-day adapter`. All six phases of
   `FractionalRataDiePlan.md` now complete.
-  **⚠ Perf concern surfaced:** these adapter numbers are far narrower
+  **⚠ Perf concern surfaced:** these adapter numbers were far narrower
   than the "17–285× faster" headline from the 2026-04-19 calendar-math
-  sweep. Logged as `OPEN_ISSUES.md § Issue 8` and `PIPELINE.md § 9b`;
-  blocks pitch delivery until resolved or framed coherently.
+  sweep. Logged as `OPEN_ISSUES.md § Issue 8` / `PIPELINE.md § 9b`.
+
+- 2026-04-22 evening — **Adapter perf investigation closed** (Issue 8 /
+  9b). Three-slice investigation in
+  `Docs-Foundation/AdapterPerfInvestigation.md`. Extended benchmarks
+  to cover `TimeZone.gmt` (fast path), `TimeZone(identifier: "UTC")`,
+  and `America/Los_Angeles` (realistic DST). **Key finding: TZ
+  dispatch cost is the entire gap.** On `TimeZone.gmt` icu4swift is
+  **10× faster than Foundation end-to-end** (118 ns vs 1,182 ns
+  round-trip) — matching the calendar-math-layer narrative. On DST
+  zones both sides are TZ-bound to ~5 µs. Two single-probe
+  optimizations attempted and reverted (one broke `.latter` policy,
+  one broke round-trip correctness on transition days). 2-probe is
+  minimum correct algorithm with public `TimeZone` API. **Inside
+  swift-foundation the internal `rawAndDaylightSavingTimeOffset` is
+  accessible — the tax vanishes by construction.** PITCH.md Beat 3
+  updated with three-zone matrix.
 
 - 2026-04-22 — **Sub-day Foundation adapter implemented** (Phases A–E of
   `FractionalRataDiePlan.md`). New `CalendarFoundation` module: two free

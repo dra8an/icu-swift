@@ -10,12 +10,26 @@ landing. Consult this first when resuming work on this project.*
 module provides `rataDieAndTimeOfDay(from:in:)` and
 `date(rataDie:hour:minute:second:nanosecond:in:repeatedTimePolicy:skippedTimePolicy:)`
 — pair of free functions matching `_CalendarGregorian`'s pattern, with
-public DST-policy enums. 51 tests (45 correctness + 6 benchmarks). Full
-suite: 383/384 pass (the 1 failure is the pre-existing Chinese 1906
-cluster). Phase F perf results in `BENCHMARK_RESULTS.md § Sub-day adapter`:
-extraction **1.95× faster than Foundation**, round-trip **1.11× faster**,
-assembly 1.27× slower (cost of 2 `secondsFromGMT` probes for DST policy
-correctness — accepted).
+public DST-policy enums. 71 tests (45 correctness + 26 benchmarks
+across GMT / UTC / LA). Full suite still 383/384 pass.
+
+**Perf investigation closed (`AdapterPerfInvestigation.md`).** Three-
+slice sweep in `Docs-Foundation/AdapterPerfInvestigation.md` resolves
+the apparent "17–285× vs 1–2×" contradiction. Summary:
+
+| Zone | icu4swift round-trip | Foundation round-trip | Ratio |
+|---|---:|---:|---:|
+| `TimeZone.gmt` (fast path) | **118 ns** | 1,182 ns | **10×** |
+| `TimeZone(identifier: "UTC")` | 3,683 ns | 4,094 ns | 1.11× |
+| `America/Los_Angeles` (DST) | 5,022 ns | 5,449 ns | 1.09× |
+
+TZ dispatch cost is the entire gap. On fast-path zones icu4swift is
+10× faster end-to-end — consistent with calendar-math layer's 17–285×
+ratio. On DST zones both sides are TZ-bound to ~5 µs by the public
+`TimeZone` API. **Inside swift-foundation (Stage 1+), the internal
+`rawAndDaylightSavingTimeOffset(for:)` is accessible — the 2-probe
+tax vanishes by construction.** PITCH.md Beat 3 updated with this
+matrix. Issue 8 / pipeline 9b resolved.
 
 Authoritative reference: `Docs-Foundation/SUBDAY_BOUNDARY.md`
 **§ Implementation**. That doc has full API signatures, DST algorithm,

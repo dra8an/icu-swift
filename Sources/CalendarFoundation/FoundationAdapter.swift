@@ -181,17 +181,34 @@ internal func resolveLocalTI(
     repeatedTimePolicy: DSTRepeatedTimePolicy,
     skippedTimePolicy: DSTSkippedTimePolicy
 ) -> Foundation.Date {
+    // A "single probe" fast path for the default `.former`/`.former`
+    // case was tried and reverted (2026-04-22). It breaks round-trip
+    // correctness for any wall-clock time on a DST-transition day whose
+    // provisional UTC interpretation lands on a different side of the
+    // transition than the intended candidate. Example: LA 04:30 on
+    // 2024-03-10 (post-transition side). `secondsFromGMT(for: "2024-03-10
+    // 04:30 UTC")` returns pre-transition PST (−8h) because the
+    // transition at 10:00 UTC hasn't happened yet; applying PST produces
+    // a candidate 1 hour off from the true 11:30 UTC. Every wall time
+    // on both halves of every DST transition day hits this — not rare.
+    //
+    // The ±24 h probe is the minimum correct algorithm with the public
+    // `TimeZone` API. `AdapterPerfInvestigation.md` documents the real
+    // answer: Stage 1+ backends live INSIDE swift-foundation and can
+    // call the internal `rawAndDaylightSavingTimeOffset(for:...)` —
+    // single dispatch, no probe tax. This adapter is the outside-
+    // consumer convenience; the 2-probe cost is inherent to the public
+    // API surface.
+
     let earlyProbe = Foundation.Date(timeIntervalSinceReferenceDate: localTI - 86_400)
     let lateProbe = Foundation.Date(timeIntervalSinceReferenceDate: localTI + 86_400)
     let offsetBefore = tz.secondsFromGMT(for: earlyProbe)
     let offsetAfter = tz.secondsFromGMT(for: lateProbe)
 
-    // Fast path: no transition within ±24 h.
     if offsetBefore == offsetAfter {
         return Foundation.Date(timeIntervalSinceReferenceDate: localTI - Double(offsetBefore))
     }
 
-    // Transition in the window. Form the two candidates.
     let candidateFormer = Foundation.Date(
         timeIntervalSinceReferenceDate: localTI - Double(offsetBefore)
     )
@@ -204,10 +221,8 @@ internal func resolveLocalTI(
 
     switch (formerValid, latterValid) {
     case (true, true):
-        // Repeated wall time (fall-back).
         return repeatedTimePolicy == .former ? candidateFormer : candidateLatter
     case (false, false):
-        // Skipped wall time (spring-forward).
         return skippedTimePolicy == .former ? candidateFormer : candidateLatter
     case (true, false):
         return candidateFormer
