@@ -146,6 +146,28 @@ Umm al-Qura's 7-second tie (2024-12-01) and Malaysia AH 1449-8.
 before any job over 15 minutes. Idle compaction is now off in `~/.claude/settings.json` (it wiped a day of context on
 2026-11-07); keep this file current before any pause.**
 
+## 6b. For an agent that has only the two repositories
+
+Everything the port needs is in the repositories; the `Research/crescent/` folder exists only on the research iMac and
+holds copyrighted sources and exploratory outputs.
+
+**Reproducible from the repositories alone:**
+- All permanent tests: `swift test --filter 'CrescentDiyanetPublishedTests|CrescentUmmAlQuraPublishedTests|HijriRegionalTests|CrescentAstronomyTests'`
+  (15 tests, ~10 s). Their data is committed: `Tests/CalendarAstronomicalTests/crescent_official_dates.csv` (published
+  first days), `announced_dates_2009_2026.csv` (the moonsighting.com compilation, dates and sources), and
+  `crescent_astronomy_fixture.csv` (our engine's values per decision evening, including Diyanet's printed map times).
+- The regional dispatcher's announced-date report (`HijriRegionalTests.announcedDatesByRegion`) now reads the committed CSV.
+- The two scripts that produced data: `Docs/crescent-tools/` (coast table from Natural Earth; parser for the
+  moonsighting.com pages, which must be fetched again with plain curl).
+- In swift-foundation `port/islamic-family`, `Docs/TEMP_Islamic_References/round-3/` is the same material as a package,
+  with a README that says what to port and the four work items.
+
+**Not reproducible without `Research/` (and not needed for the port):** Diyanet's AH 1318–1444 list before AH 1399
+(the 617/971 pre-rule analysis), the 326 Diyanet maps and their OCR/registration (`round3-raw/`, `pre2016/`), the
+Natural Earth land rows and the zone overlays, the raw outputs of the rejected hypotheses in rounds 3–6 (their numbers
+are quoted in `Docs/CRESCENT_RULES_RESULTS.md`, and the probe suites that produced them are committed in
+`CrescentDiyanetProbe.swift`, each gated on an env var naming its input), the Keleş article PDF.
+
 ## 7. Working rules for this user (non-negotiable)
 
 - **Never commit or push without explicit instruction.** A push needs the word "push" in the same request; the user

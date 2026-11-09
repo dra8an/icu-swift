@@ -77,8 +77,11 @@ private func score(_ starts: [Int: Int64], from firstIndex: Int = 0, _ length: (
     }
 
     /// Announced dates per region through the dispatcher: the first day predicted for the lunation vs the announced one.
+    /// Reads `announced_dates_2009_2026.csv` next to this file (override with env ANNOUNCED_CSV). A report, not an assertion.
     @Test func announcedDatesByRegion() {
-        guard let path = ProcessInfo.processInfo.environment["ANNOUNCED_CSV"], let text = try? String(contentsOfFile: path, encoding: .utf8) else { return }
+        let defaultPath = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("announced_dates_2009_2026.csv").path
+        let path = ProcessInfo.processInfo.environment["ANNOUNCED_CSV"] ?? defaultPath
+        guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return }
         let iso: [String: String] = ["Pakistan": "PK", "Morocco": "MA", "Oman": "OM", "India": "IN", "Bangladesh": "BD", "Iran": "IR", "Egypt": "EG",
             "Saudi Arabia": "SA", "Indonesia": "ID", "Malaysia": "MY", "Turkey": "TR", "Algeria": "DZ", "Tunisia": "TN", "Libya": "LY", "Nigeria": "NG",
             "South Africa": "ZA", "Brunei": "BN", "Sri Lanka": "LK", "Jordan": "JO", "Kuwait": "KW", "Australia": "AU", "New Zealand": "NZ", "Nepal": "NP",
