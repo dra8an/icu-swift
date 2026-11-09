@@ -1,6 +1,6 @@
 # Islamic crescent rules — session handoff
 
-Last update: 2026-11-09. Read this file first, then `Docs/CRESCENT_RULES_RESULTS.md` (same folder).
+Last update: 2026-11-09 (evening). Read this file first, then `Docs/CRESCENT_RULES_RESULTS.md` (same folder).
 
 ## 1. What this work is
 
@@ -22,13 +22,13 @@ Our role: **research + independent verification.** We never touch the other agen
 
 | What | Path / branch |
 |---|---|
-| icu4swift package | `/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift`, branch **`islamic-crescent`** (off `main` 8fb6b3f). **All crescent work is UNCOMMITTED/untracked.** `main` has 3 old uncommitted doc edits (Docs-Foundation/MASTER.md, PORT_DIRECTION.md, Docs/HANDOFF.md) that are NOT ours — leave them. |
+| icu4swift package | `/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift`, branch **`islamic-crescent`** (off `main` 8fb6b3f). Committed as `fc4417e` and pushed to `origin/islamic-crescent` on 2026-11-09 (first push of the branch). `main` has 3 old uncommitted doc edits (Docs-Foundation/MASTER.md, PORT_DIRECTION.md, Docs/HANDOFF.md) that are NOT ours — leave them. |
 | Moon/sun astronomy (new) | `Sources/AstronomicalEngine/CrescentAstronomy.swift`, `LunarSeriesTables.swift` (generated from ICU4X astronomy.rs, Apache-2.0) |
 | The rules (new) | `Sources/CalendarAstronomical/CrescentRules.swift` |
 | Tests | `Tests/AstronomicalEngineTests/CrescentAstronomyTests.swift` (8 reference checks), `Tests/CalendarAstronomicalTests/CrescentRulesComparison.swift` (measurement), data `crescent_official_dates.csv`, `CrescentDiyanetProbe.swift` (TEMPORARY, ~1,400 lines, rounds 3–6; suites take env `DIYANET_HISTORY`, `DIYANET_CSV`, `COAST_CSV`, `LAND_ROWS`, see `Research/crescent/round6-raw/README.md`; the authoritative scored run is `swift test --filter CrescentDiyanetFinalScore`, ~5 min) |
 | Results report | `Docs/CRESCENT_RULES_RESULTS.md` (rounds 1–6) |
 | Diyanet spec for the port | `Docs/CRESCENT_DIYANET_SPEC.md` (Option B: era rules + five corrections, 707/707); permanent test `Tests/CalendarAstronomicalTests/CrescentDiyanetPublishedTests.swift` |
-| Proposal on `.islamic` for the port | `Docs/CRESCENT_ISLAMIC_IDENTIFIER_NOTE.md` (one proposal, no stages: region-aware `.islamic`, default Umm al-Qura; ICU's clock matches 20% of announced dates; work items: routing, region on Calendar, formatter, rules+data). Reference implementation `Sources/CalendarAstronomical/HijriRegional.swift` + `Tests/CalendarAstronomicalTests/HijriRegionalTests.swift` (UQ 131/131, Diyanet 707/707, Malaysia 98/98, Indonesia 25/25; announced dates: sighting 81%, Saudi bloc 77%). Not delivered. |
+| Proposal on `.islamic` for the port | `Docs/CRESCENT_ISLAMIC_IDENTIFIER_NOTE.md` (one proposal, no stages: region-aware `.islamic`, default Umm al-Qura; ICU's clock matches 20% of announced dates; work items: routing, region on Calendar, formatter, rules+data). Reference implementation `Sources/CalendarAstronomical/HijriRegional.swift` + `Tests/CalendarAstronomicalTests/HijriRegionalTests.swift` (UQ 131/131, Diyanet 707/707, Malaysia 98/98, Indonesia 25/25; announced dates: sighting 81%, Saudi bloc 77%). Delivered in round 3. |
 | Local research artifacts | `Research/crescent/` (excluded via `.git/info/exclude`; `*-local-only/` folders are copyrighted — NEVER commit): raw research JSON, Natural Earth land v5.1.2 + `west_coast.py`, Diyanet's official visibility maps, JUPEM/eKITAB PDFs, raw run outputs |
 | Research files delivered to the other agent | swift-foundation worktree `/Users/draganbesevic/Projects/claude/swift-foundation-islamic` (branch `port/islamic-family`, committed + pushed, head 9c0d26d3): `Docs/TEMP_Islamic_References_Request.md` (the other agent's questions, rounds 1–2), `Docs/TEMP_Islamic_References/*.md` (round 1: Diyanet, MABIMS, Egypt, Umm_al-Qura, Archives, SUMMARY), `.../round-2/1_Diyanet.md, 2_American_west_coast.md, 3_Malaysia_JAKIM.md, 4_Umm_al-Qura.md` |
 | Main swift-foundation checkout | `/Users/draganbesevic/Projects/claude/swift-foundation`, branch `port/chinese` = frozen research archive (not used for this work). `backup/HANDOFF.md` has an uncommitted rewrite (2026-11-05) of the overall calendar-port state. |
@@ -97,7 +97,7 @@ and `diyanetStartsTomorrow` (lean evaluation, early exit). The permanent test
 707/707 with the corrections and exactly 702 without, with the five misses named; it runs in 7 s. The test data CSV
 gained Diyanet's first days AH 1398-12 … 1439-12 (493 rows, dates as published facts; the user has not yet said whether
 these may be committed). The spec for the other agent is `Docs/CRESCENT_DIYANET_SPEC.md` (rule, conventions, precision
-table, corrections, validity range, test data). Nothing passed on yet.
+table, corrections, validity range, test data). Delivered 2026-11-09 as round 3 (see below).
 
 **Our position on scope (2026-11-09; the user: decisions are as much ours as the other agent's).** Ship as computed
 calendars only what is reproducible to 100% from published data: **Diyanet** (era rules + five corrections, 707/707),
@@ -120,7 +120,7 @@ doc § Round 7, spec §9. The port's formatters compute Hijri fields in ICU (`ud
 `.islamic` would print ICU's dates: the first blocker for the user's two-constructor idea. Data: `Research/crescent/
 announcements-local-only/` (keep local), `round6-raw/announcements_measure.txt`. Dar al-Ifta's archive starts 2017.
 
-**Package for the other agent assembled (2026-11-09, afternoon), not committed:** swift-foundation worktree
+**Package for the other agent delivered (2026-11-09): committed on `port/islamic-family` as "TEMPORARY: round 3 …" and pushed by the user.** swift-foundation worktree
 `Docs/TEMP_Islamic_References/round-3/` (README, spec, proposal, results doc, reference code as `.swift.txt`, the four
 tests, `crescent_official_dates.csv`, `announced_dates_2009_2026.csv`, `american_west_coast_generator.py`,
 `crescent_astronomy_fixture.csv` from probe `CrescentFixtureExport`). The user reviews, then commits and pushes
@@ -138,8 +138,8 @@ and Egypt (9) not yet done in this form.
 CrescentRules.swift` as the reference implementation (the B-period latitude rule is in the probe's `FinalScore`, not yet
 in `CrescentRules`), the official-date CSV, and the five-date list. Nothing has been passed yet.
 
-**Housekeeping:** nothing committed or pushed; `CrescentDiyanetProbe.swift` is temporary (delete or trim before any
-commit); `Research/crescent/` stays git-excluded (copyrighted maps and Diyanet's list). Still open from earlier rounds:
+**Housekeeping:** icu4swift work committed (`fc4417e`) and pushed; `CrescentDiyanetProbe.swift` was committed too, as the
+reproducible record of every rejected hypothesis (its suites skip without their env vars); `Research/crescent/` stays git-excluded (copyrighted maps and Diyanet's list). Still open from earlier rounds:
 Umm al-Qura's 7-second tie (2024-12-01) and Malaysia AH 1449-8.
 
 **Cadence rule: a status line before and after every step; never more than ~10 minutes without one; propose and wait
