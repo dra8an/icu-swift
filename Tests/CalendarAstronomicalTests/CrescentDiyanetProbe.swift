@@ -1612,3 +1612,297 @@ private func loadStartsFromEnv(_ env: [String: String]) -> [Int: Int64]? {
         print("FIXTURE|rows \(lines.count - 1)|\(outPath)")
     }
 }
+
+/// Our Umm al-Qura rule (conjunction before sunset, moonset after sunset at the Kaaba) against the whole KACST table
+/// AH 1300–1600, with the margins of every miss. The current rule dates from AH 1420; earlier years used other rules.
+@Suite struct CrescentUmmAlQuraTableSweep {
+    @Test func sweep() throws {
+        let uq = IslamicUmmAlQura()
+        func first(_ y: Int, _ m: Int) throws -> Int64 { uq.toRataDie(try uq.newDate(year: .extended(Int32(y)), month: Month(integerLiteral: UInt8(m)), day: 1)).dayNumber }
+        var eras: [String: (Int, Int)] = [:]
+        var closest: [(Double, String)] = []
+        for y in 1300...1600 {
+            for m in 1...12 {
+                if y == 1300 && m == 1 { continue }
+                let (py, pm) = m == 1 ? (y - 1, 12) : (y, m - 1)
+                let p = try first(py, pm), s = try first(y, m)
+                let rule = CrescentRules.ummAlQuraMonthLength(start: RataDie(p), next: (y, m), corrections: false)
+                let era = y >= 1420 ? "1420-1600 (current rule)" : "1300-1419 (earlier rules)"
+                var t = eras[era] ?? (0, 0); t.1 += 1
+                let e = CrescentRules.evening(RataDie(p + 28), at: CrescentRules.makkah)
+                let lag = e?.lagMinutes, conjMargin = e.map { ($0.sunset - $0.conjunction) * 1440 }
+                if rule == Int(s - p) { t.0 += 1 } else if y >= 1420 {
+                    print(String(format: "UQMISS|AH %d-%02d|table %dd rule %dd|evening %@|lag %+.2f min|sunset-conjunction %+.1f min", y, m, s - p, rule, CrescentFixtureExport.date(p + 28), lag ?? .nan, conjMargin ?? .nan))
+                }
+                eras[era] = t
+                if y >= 1420, let lag, let cm = conjMargin {
+                    let tight = min(abs(lag), abs(cm))
+                    if tight < 1 { closest.append((tight, String(format: "AH %d-%02d lag %+.2f min, sunset-conj %+.1f min, rule %@ table", y, m, lag, cm, rule == Int(s - p) ? "==" : "!="))) }
+                }
+            }
+        }
+        for (k, v) in eras.sorted(by: { $0.key < $1.key }) { print("UQSWEEP|\(k)|\(v.0)/\(v.1)") }
+        print("UQTIES|months 1420-1600 within 1 minute of a threshold: \(closest.count)")
+        for c in closest.sorted(by: { $0.0 < $1.0 }) { print("UQTIE|\(c.1)") }
+    }
+}
+
+/// What is the ICU "Umm al-Qura" table outside KACST's published range? Compare its first days with the arithmetic calendars.
+@Suite struct CrescentUmmAlQuraTableOrigin {
+    @Test func compare() throws {
+        let uq = IslamicUmmAlQura(), civil = IslamicCivil(), tabular = IslamicTabular()
+        func fd<C: CalendarProtocol>(_ c: C, _ y: Int, _ m: Int) throws -> Int64 where C.DateInner == IslamicTabularDateInner {
+            c.toRataDie(try c.newDate(year: .extended(Int32(y)), month: Month(integerLiteral: UInt8(m)), day: 1)).dayNumber
+        }
+        for (name, lo, hi) in [("1300-1355", 1300, 1355), ("1356-1419", 1356, 1419), ("1420-1450 (published)", 1420, 1450), ("1451-1500", 1451, 1500), ("1501-1600", 1501, 1600)] {
+            var n = 0, sameCivil = 0, sameTab = 0, diffs: [Int: Int] = [:]
+            for y in lo...hi { for m in 1...12 {
+                let a = try fd(uq, y, m), b = try fd(civil, y, m), c = try fd(tabular, y, m)
+                n += 1; if a == b { sameCivil += 1 }; if a == c { sameTab += 1 }; diffs[Int(a - b), default: 0] += 1
+            } }
+            print("UQORIGIN|\(name)|months \(n)|same as civil (Friday epoch) \(sameCivil)|same as tabular (Thursday epoch) \(sameTab)|table minus civil day histogram \(diffs.sorted(by: { $0.key < $1.key }))")
+        }
+    }
+}
+
+/// Which rule generated the ICU table outside 1420–1450? Candidates against the table's month lengths, per range.
+@Suite struct CrescentUmmAlQuraTableRule {
+    @Test func identify() throws {
+        let uq = IslamicUmmAlQura()
+        func first(_ y: Int, _ m: Int) throws -> Int64 { uq.toRataDie(try uq.newDate(year: .extended(Int32(y)), month: Month(integerLiteral: UInt8(m)), day: 1)).dayNumber }
+        let names = ["conj<sunset & moonset>sunset (current UQ)", "moonset>sunset only (1420-22)", "conj<sunset only", "conj<Mecca midnight", "conj<00UTC", "age>=12h at Mecca sunset", "conj<12UTC (ISESCO)", "ICU islamic clock (ceil conj UTC)"]
+        for (range, lo, hi) in [("1300-1355", 1300, 1355), ("1356-1419", 1356, 1419), ("1420-1450", 1420, 1450), ("1451-1500", 1451, 1500), ("1501-1600", 1501, 1600)] {
+            var hits = [Int](repeating: 0, count: names.count), n = 0
+            for y in lo...hi { for m in 1...12 {
+                if y == 1300 && m == 1 { continue }
+                let (py, pm) = m == 1 ? (y - 1, 12) : (y, m - 1)
+                let p = try first(py, pm), s = try first(y, m); let len = Int(s - p); n += 1
+                guard let e = CrescentRules.evening(RataDie(p + 28), at: CrescentRules.makkah) else { continue }
+                let conjBeforeSunset = e.conjunction < e.sunset && e.sunset - e.conjunction < 3
+                let moonsetAfter = e.moonset.map { $0 > e.sunset } ?? false
+                let midnightMecca = Moment(Double(p + 29) - 3.0 / 24)   // 00:00 Mecca = 21:00 UTC of the evening's date
+                let midnightUTC = Moment(Double(p + 29))
+                let conj = Astronomical.newMoonBefore(midnightUTC + 0.5)
+                let preds = [conjBeforeSunset && moonsetAfter, moonsetAfter, conjBeforeSunset,
+                             conj < midnightMecca && midnightMecca - conj < 3, conj < midnightUTC && midnightUTC - conj < 3,
+                             conjBeforeSunset && (e.sunset - e.conjunction) * 24 >= 12,
+                             conj < Moment(Double(p + 28) + 0.5) && Moment(Double(p + 28) + 0.5) - conj < 3,
+                             Int64(ceil(conj.inner)) == p + 29]
+                for (i, pr) in preds.enumerated() where (pr ? 29 : 30) == len { hits[i] += 1 }
+            } }
+            print("UQRULE|\(range)|months \(n)|" + zip(names, hits).map { "\($0): \($1) (\(100 * $1 / max(n, 1))%)" }.joined(separator: " | "))
+        }
+    }
+}
+
+/// Moon-age variants against the ICU table outside 1420–1450: age measured at Mecca sunset, Mecca midnight, 00 UTC,
+/// 12 UTC, with thresholds 0–24 h; also the same with the mean conjunction (mean synodic month from a fixed epoch).
+@Suite struct CrescentUmmAlQuraTableAgeSweep {
+    @Test func sweep() throws {
+        let uq = IslamicUmmAlQura()
+        func first(_ y: Int, _ m: Int) throws -> Int64 { uq.toRataDie(try uq.newDate(year: .extended(Int32(y)), month: Month(integerLiteral: UInt8(m)), day: 1)).dayNumber }
+        let thresholds: [Double] = [0, 6, 8, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24]
+        let moments = ["Mecca sunset", "Mecca midnight", "00 UTC", "12 UTC", "Mecca noon"]
+        for (range, lo, hi) in [("1356-1419", 1356, 1419), ("1451-1600", 1451, 1600)] {
+            var hits = [[Int]](repeating: [Int](repeating: 0, count: thresholds.count), count: moments.count), n = 0
+            var meanHits = [Int](repeating: 0, count: thresholds.count)
+            for y in lo...hi { for m in 1...12 {
+                let (py, pm) = m == 1 ? (y - 1, 12) : (y, m - 1)
+                let p = try first(py, pm), s = try first(y, m); let len = Int(s - p); n += 1
+                let midnightUTC = Moment(Double(p + 29))
+                let conj = Astronomical.newMoonBefore(midnightUTC + 0.5)
+                guard let e = CrescentRules.evening(RataDie(p + 28), at: CrescentRules.makkah) else { continue }
+                let refs = [e.sunset, Moment(Double(p + 29) - 3.0 / 24), midnightUTC, Moment(Double(p + 28) + 0.5), Moment(Double(p + 28) + 0.5 - 3.0 / 24 + 0.0)]
+                for (i, r) in refs.enumerated() {
+                    let age = (r - conj) * 24
+                    for (j, t) in thresholds.enumerated() where ((age >= t && age < 72) ? 29 : 30) == len { hits[i][j] += 1 }
+                }
+                // mean conjunction: mean new moon nearest before, from epoch 2000-01-06 18:14 UTC, synodic 29.530588853 d
+                let epoch = 730125.0 + 18.23 / 24
+                let k = floor((midnightUTC.inner + 0.5 - epoch) / 29.530588853)
+                let meanConj = epoch + k * 29.530588853
+                let meanAge = (e.sunset.inner - meanConj) * 24
+                for (j, t) in thresholds.enumerated() where ((meanAge >= t && meanAge < 72) ? 29 : 30) == len { meanHits[j] += 1 }
+            } }
+            for (i, mo) in moments.enumerated() {
+                print("UQAGE|\(range)|\(mo)|" + zip(thresholds, hits[i]).map { String(format: "%.0fh:%d%%", $0, 100 * $1 / max(n, 1)) }.joined(separator: " "))
+            }
+            print("UQAGE|\(range)|mean conj, Mecca sunset|" + zip(thresholds, meanHits).map { String(format: "%.0fh:%d%%", $0, 100 * $1 / max(n, 1)) }.joined(separator: " "))
+        }
+    }
+}
+
+/// Alignment of the ICU table's month starts with the conjunction: histogram of (table first day − UTC date after the
+/// conjunction) per range. The 1392–1419 rule ("new moon less than 3 h after Saudi midnight" = before 00:00 UTC) predicts 0.
+@Suite struct CrescentUmmAlQuraTableAlignment {
+    @Test func histogram() throws {
+        let uq = IslamicUmmAlQura()
+        func first(_ y: Int, _ m: Int) throws -> Int64 { uq.toRataDie(try uq.newDate(year: .extended(Int32(y)), month: Month(integerLiteral: UInt8(m)), day: 1)).dayNumber }
+        for (range, lo, hi) in [("1300-1355", 1300, 1355), ("1356-1391", 1356, 1391), ("1392-1419", 1392, 1419), ("1420-1422", 1420, 1422), ("1423-1450", 1423, 1450), ("1451-1500", 1451, 1500), ("1501-1600", 1501, 1600)] {
+            var hist: [Int: Int] = [:], n = 0
+            for y in lo...hi { for m in 1...12 {
+                let s = try first(y, m)
+                let conj = Astronomical.newMoonBefore(Moment(Double(s) + 2.0))
+                let clock = Int64(ceil(conj.inner))      // UTC date whose 00:00 is the first after the conjunction
+                hist[Int(s - clock), default: 0] += 1; n += 1
+            } }
+            print("UQALIGN|\(range)|months \(n)|table first day minus (day after conjunction, UTC): " + hist.sorted(by: { $0.key < $1.key }).map { "\($0.key): \(100 * $0.value / n)%" }.joined(separator: ", "))
+        }
+    }
+}
+
+/// Emulates ICU's astronomical `islamic` month start (trueMonthStart: mean-month guess at 00:00 UTC from the Hijra epoch,
+/// step back while the moon is past new, else forward until it is, then +1 day) with our ephemeris, and compares it
+/// with the ICU "Umm al-Qura" table per range.
+@Suite struct CrescentUmmAlQuraTableIsICUIslamic {
+    static func moonPastNew(_ t: Moment) -> Bool {
+        let c = Astronomical.julianCenturies(t)
+        var dl = (Astronomical.lunarLongitude(c) - Astronomical.solarLongitude(c)).truncatingRemainder(dividingBy: 360)
+        if dl < 0 { dl += 360 }
+        return dl < 180
+    }
+    static func icuIslamicStart(year: Int, month: Int) -> Int64 {
+        let hijra = 227015.0
+        let index = Double((year - 1) * 12 + (month - 1))
+        var t = hijra + floor(index * 29.530588853)
+        if moonPastNew(Moment(t)) { repeat { t -= 1 } while moonPastNew(Moment(t)) } else { repeat { t += 1 } while !moonPastNew(Moment(t)) }
+        return Int64(t) + 1
+    }
+    @Test func compare() throws {
+        let uq = IslamicUmmAlQura()
+        func first(_ y: Int, _ m: Int) throws -> Int64 { uq.toRataDie(try uq.newDate(year: .extended(Int32(y)), month: Month(integerLiteral: UInt8(m)), day: 1)).dayNumber }
+        for (range, lo, hi) in [("1300-1355", 1300, 1355), ("1356-1391", 1356, 1391), ("1392-1419", 1392, 1419), ("1420-1450", 1420, 1450), ("1451-1500", 1451, 1500), ("1501-1600", 1501, 1600)] {
+            var n = 0, same = 0, hist: [Int: Int] = [:]
+            for y in lo...hi { for m in 1...12 {
+                let s = try first(y, m), i = Self.icuIslamicStart(year: y, month: m)
+                n += 1; if s == i { same += 1 }; hist[Int(s - i), default: 0] += 1
+            } }
+            print("UQICU|\(range)|months \(n)|table == emulated ICU islamic: \(same) (\(100 * same / n)%)|table minus emulated: " + hist.sorted(by: { $0.key < $1.key }).map { "\($0.key): \($0.value)" }.joined(separator: ", "))
+        }
+    }
+}
+
+/// Round 4 (2026-11-11): the other agent's two Umm al-Qura rules, evaluated with our engine against the whole ICU table,
+/// AH 1300-01 to 1600-11 (the month whose length is decided labels the row). Definitions as in its code
+/// (swift-foundation port/islamic-family 5396bd74, `VisibilityRule.ummAlQura` and `.ummAlQuraTable`):
+/// Rule A (AH 1423 on): the new moon comes before the geometric sunset (the sun's centre at 0°, no refraction); at the
+/// moment the sun's centre is 34' + dip below the horizon, the moon's topocentric centre is at or above that same line.
+/// Rule B (found by it from the table; AH 1451–1600 and 1300–1419): at the geometric sunset, the new moon came before
+/// 00:00 Mecca time of that day, or the moon is at least 5.5 hours old and its topocentric centre, without refraction,
+/// sets at least 19.515 minutes later. Writes one row per month to the file named by UQ_ROUND4_OUT.
+@Suite struct CrescentUmmAlQuraRound4Check {
+    static let mecca = Location(latitude: 21.4225, longitude: 39.8256, elevation: 295, utcOffset: 3.0 / 24)
+
+    /// Moment in [lo, hi] at which `f` falls through `target`, by bisection (far below a second), or nil.
+    static func falling(from lo: Double, to hi: Double, target: Double, _ f: (Moment) -> Double) -> Moment? {
+        var a = lo, b = hi
+        guard f(Moment(a)) > target, f(Moment(b)) <= target else { return nil }
+        for _ in 0..<60 { let mid = (a + b) / 2; if f(Moment(mid)) > target { a = mid } else { b = mid } }
+        return Moment((a + b) / 2)
+    }
+
+    struct Row {
+        var year = 0, month = 0, first: Int64 = 0, tableDays = 0
+        var newMoon = Moment(0), geometricSunset = Moment(0)
+        var ageHours = 0.0, beforeDayStartHours = 0.0, centreLagMinutes = Double.nan, marginA = Double.nan
+        var ruleA = 30, ruleB = 30, ours = 30
+        var ourLag: Double? = nil, ourConjunctionMargin: Double? = nil
+    }
+
+    static func row(year y: Int, month m: Int, first p: Int64, next s: Int64, lagLimit: Double = 19.515, ageLimit: Double = 5.5) -> Row? {
+        let place = mecca, evening = p + 28
+        let noon = Double(evening) + 0.5 - place.longitude / 360          // local mean noon, universal time
+        let depression = Astronomical.refraction(place)                   // 34' + dip of the horizon at 295 m
+        let sunAltitude: (Moment) -> Double = { Astronomical.solarHorizontal($0, location: place).altitude }
+        let moonAltitude: (Moment) -> Double = { Astronomical.topocentricLunarHorizontal($0, location: place).altitude }
+        guard let geometricSunset = falling(from: noon, to: noon + 0.5, target: 0, sunAltitude),
+              let refractedSunset = falling(from: noon, to: noon + 0.5, target: -depression, sunAltitude) else { return nil }
+        // The new moon that ends this month: the last one before the geometric sunset if it is recent, otherwise the next one.
+        let before = Astronomical.newMoonBefore(geometricSunset)
+        let recent = geometricSunset - before < 7
+        let newMoon = recent ? before : Astronomical.newMoonAtOrAfter(geometricSunset)
+        var r = Row()
+        (r.year, r.month, r.first, r.tableDays) = (y, m, p, Int(s - p))
+        (r.newMoon, r.geometricSunset) = (newMoon, geometricSunset)
+        r.ageHours = (geometricSunset - newMoon) * 24
+        r.beforeDayStartHours = (Double(evening) - place.utcOffset - newMoon.inner) * 24
+        if let moonCentreSet = falling(from: noon + 2.0 / 24, to: noon + 0.5, target: 0, moonAltitude) {
+            r.centreLagMinutes = (moonCentreSet - geometricSunset) * 1440
+        }
+        r.marginA = moonAltitude(refractedSunset) + depression
+        r.ruleA = recent && r.marginA >= 0 ? 29 : 30
+        let byLag = r.ageHours >= ageLimit && r.centreLagMinutes >= lagLimit   // NaN compares false
+        let byDay = r.beforeDayStartHours > 0
+        r.ruleB = recent && (byLag || byDay) ? 29 : 30
+        r.ours = CrescentRules.ummAlQura(RataDie(evening), .twoConditions) ? 29 : 30
+        if let e = CrescentRules.evening(RataDie(evening), at: CrescentRules.makkah) {
+            r.ourLag = e.lagMinutes
+            let conjunctionOfMonth = e.sunset - e.conjunction < 7 ? e.conjunction : Astronomical.newMoonAtOrAfter(e.sunset)
+            r.ourConjunctionMargin = (e.sunset - conjunctionOfMonth) * 1440
+        }
+        return r
+    }
+
+    @Test func check() throws {
+        guard let out = ProcessInfo.processInfo.environment["UQ_ROUND4_OUT"] else { return }
+        let uq = IslamicUmmAlQura()
+        func first(_ y: Int, _ m: Int) throws -> Int64 { uq.toRataDie(try uq.newDate(year: .extended(Int32(y)), month: Month(integerLiteral: UInt8(m)), day: 1)).dayNumber }
+        var lines = ["hijri_year,hijri_month,first_day,evening,table_days,new_moon_utc,geometric_sunset_utc,age_hours,new_moon_before_day_start_hours,centre_lag_minutes,moon_margin_degrees,rule_a_days,rule_b_days,our_rule_days,our_lag_minutes,our_sunset_minus_conjunction_minutes"]
+        var tally: [String: [Int]] = [:]   // era: months, rule A, rule B, our rule
+        let f = CrescentFixtureExport.f
+        for y in 1300...1600 {
+            for m in 1...12 {
+                if y == 1600 && m == 12 { continue }   // its length needs 1 Muharram 1601, outside the table
+                let (ny, nm) = m == 12 ? (y + 1, 1) : (y, m + 1)
+                let p = try first(y, m), s = try first(ny, nm)
+                guard let r = Self.row(year: y, month: m, first: p, next: s) else { print("UQ4|no sunset|AH \(y)-\(m)"); continue }
+                let era = y < 1420 ? "1300-1419" : y < 1423 ? "1420-1422" : y <= 1450 ? "1423-1450" : "1451-1600/11"
+                var t = tally[era] ?? [0, 0, 0, 0]
+                t[0] += 1
+                if r.ruleA == r.tableDays { t[1] += 1 }
+                if r.ruleB == r.tableDays { t[2] += 1 }
+                if r.ours == r.tableDays { t[3] += 1 }
+                tally[era] = t
+                lines.append("\(y),\(m),\(CrescentFixtureExport.date(p)),\(CrescentFixtureExport.date(p + 28)),\(r.tableDays),\(CrescentFixtureExport.utc(r.newMoon)),\(CrescentFixtureExport.utc(r.geometricSunset)),\(f(r.ageHours, 4)),\(f(r.beforeDayStartHours, 4)),\(r.centreLagMinutes.isNaN ? "" : f(r.centreLagMinutes, 4)),\(f(r.marginA, 5)),\(r.ruleA),\(r.ruleB),\(r.ours),\(f(r.ourLag, 4)),\(f(r.ourConjunctionMargin, 2))")
+            }
+        }
+        for (k, v) in tally.sorted(by: { $0.key < $1.key }) { print("UQ4|\(k)|months \(v[0])|rule A \(v[1])|rule B \(v[2])|our rule \(v[3])") }
+        try lines.joined(separator: "\n").appending("\n").write(toFile: out, atomically: true, encoding: .utf8)
+        print("UQ4|rows \(lines.count - 1)|\(out)")
+    }
+
+    /// The same rules against any other list of month starts (hijri_year,hijri_month,first_day as yyyy-mm-dd) named by
+    /// UQ_FIRSTDAYS_CSV; used for the table in Microsoft's .NET (AH 1318–1500, MIT-licensed source). Adds the rule
+    /// documented for AH 1392–1419 (van Gent): the month starts on the day after the UTC date of the new moon.
+    @Test func otherTable() throws {
+        guard let path = ProcessInfo.processInfo.environment["UQ_FIRSTDAYS_CSV"], let text = try? String(contentsOfFile: path, encoding: .utf8) else { return }
+        var firstDay: [Int: Int64] = [:]   // year * 12 + month - 1
+        for line in text.split(whereSeparator: \.isNewline).dropFirst() {
+            let f = line.split(separator: ","); guard f.count >= 3, let y = Int(f[0]), let m = Int(f[1]) else { continue }
+            let d = f[2].split(separator: "-").compactMap { Int($0) }; guard d.count == 3 else { continue }
+            firstDay[y * 12 + m - 1] = rd(d[0], d[1], d[2])
+        }
+        var tally: [String: [Int]] = [:]   // era: months, rule A, rule B, our rule, day after the new moon's UTC date
+        for key in firstDay.keys.sorted() {
+            guard let p = firstDay[key], let s = firstDay[key + 1] else { continue }
+            let y = key / 12, m = key % 12 + 1
+            guard let r = Self.row(year: y, month: m, first: p, next: s) else { continue }
+            let utcClock = r.newMoon.inner < Double(p + 29) ? 29 : 30
+            let era = y < 1356 ? "1318-1355" : y < 1392 ? "1356-1391" : y < 1420 ? "1392-1419" : y < 1423 ? "1420-1422" : y <= 1450 ? "1423-1450" : "1451-1500"
+            var t = tally[era] ?? [0, 0, 0, 0, 0]
+            t[0] += 1
+            if r.ruleA == r.tableDays { t[1] += 1 }
+            if r.ruleB == r.tableDays { t[2] += 1 }
+            if r.ours == r.tableDays { t[3] += 1 }
+            if utcClock == r.tableDays { t[4] += 1 }
+            tally[era] = t
+            if y >= 1451, r.ruleA != r.tableDays {
+                print(String(format: "UQ4OTHER|miss of rule A|AH %d-%02d|evening %@|table %dd rule A %dd|age %+.2f min|moon margin %+.4f deg|centre lag %+.2f min", y, m, CrescentFixtureExport.date(p + 28), r.tableDays, r.ruleA, r.ageHours * 60, r.marginA, r.centreLagMinutes))
+            }
+            if (1392...1419).contains(y), utcClock != r.tableDays {
+                print(String(format: "UQ4OTHER|miss of the UTC-date rule|AH %d-%02d|evening %@|table %dd rule %dd|new moon %@", y, m, CrescentFixtureExport.date(p + 28), r.tableDays, utcClock, CrescentFixtureExport.utc(r.newMoon)))
+            }
+        }
+        for (k, v) in tally.sorted(by: { $0.key < $1.key }) { print("UQ4OTHER|\(k)|months \(v[0])|rule A \(v[1])|rule B \(v[2])|our rule \(v[3])|day after the new moon's UTC date \(v[4])") }
+    }
+}

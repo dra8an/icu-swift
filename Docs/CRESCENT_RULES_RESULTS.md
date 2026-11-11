@@ -507,3 +507,149 @@ anywhere in the country; a western or southern point would fit some countries be
 its own `islamic` calendar; the Swift calendar's month starts are not consulted when formatting. A location-aware
 `.islamic` would therefore compute one date and print another unless formatting is changed to take the fields from the
 Swift calendar. That is the first engineering question for any such proposal.
+
+### Round 8 (2026-11-09, evening): ICU's Umm al-Qura table is official only for AH 1420–1450
+
+> **Corrected by Round 9 (2026-11-11). Read Round 9 before using anything below.** The measurements of this section
+> stand. Three of its conclusions do not. (1) The table outside AH 1420–1450 is not "synthetic" in the sense of being
+> nobody's calendar: KACST's own site shows its dates in all ten months checked (nine in AH 1451–1500, one before 1420), and it follows one
+> exact rule that the other agent found. (2) "Nobody publishes 1451–1600" is wrong for 1451–1500: KACST's site and
+> Microsoft's .NET both do, and they disagree with each other. (3) Consequences (1) and (2) are withdrawn:
+> `HijriRegional` uses the table for AH 1300–1600 again, and nothing is to be reported upstream on this evidence. Also,
+> the table's row for 1451–1600 says "same" as 1300–1419; in fact all its misses go one way (table 30 days, rule 29,
+> moonset 0 to 20.5 minutes after sunset), which this section did not report. The title is kept for the record.
+
+Prompted by the other agent's claim that its Umm al-Qura "needs no correction and covers 2100 more months", our rule
+(conjunction before sunset and moonset after sunset at the Kaaba) was swept against the whole ICU table, AH 1300–1600
+(`CrescentUmmAlQuraTableSweep`, `round6-raw/ummalqura_table_sweep.txt`):
+
+| Range | Rule = table | Misses | What the misses are |
+|---|---|---|---|
+| 1420–1450 (372 months) | 368 | 4 | AH 1421-7, 1422-8: the 1420–1422 rule (moonset only, no conjunction condition; van Gent's rules page); 1427-6: conjunction 66 s before sunset; 1446-6: moonset 4 s before sunset |
+| 1300–1419 | 65% | ~500 | lags of ±15 min, not ties |
+| 1451–1600 | 65% | ~630 (37–45 per decade) | same |
+
+Outside 1420–1450 the table is also not the arithmetic calendar (civil 63%, Thursday-epoch tabular 29%), not ICU's
+own `islamic` algorithm (emulated with our ephemeris: 18–20%), and not the documented 1392–1419 rule ("new moon less
+than 3 h after Saudi midnight" = before 00:00 UTC: 47%). Its month starts fall one day after the UTC-conjunction
+clock 78–80% of the time and on it 18–20%, with the **same distribution in 1300–1419 and 1451–1600** and a different
+one in 1420–1450; no month in 1356–1391 starts before the new moon, which the real calendar did in 17.5% of those
+months (van Gent). The best single description is a crude clock, "new moon before about 04:30 UTC starts the month
+next day, otherwise the day after" (88%). So the table's official content is 1420–1450, the range of the Ministry's
+printed "1420–1450 HQ" calendar that our 131-decision check used; the other 3,240 months are synthetic and disagree
+with the official rule in about one month in three.
+
+Documented rule history (van Gent, Utrecht, `ummalqura_rules.htm`, June 2026): before 1392 uncertain; 1392–1419 new
+moon less than 3 h after Saudi midnight; 1420–1422 moonset after sunset at Mecca; from 1423 conjunction before sunset
+and moonset after sunset. Official publications: KFUPM comparison table 1356–1411; Ministry tables 1300–1429 (printed
+1413) and 1420–1450 (printed c. 2003). van Gent's converter is valid 1356–1500 and "will give erroneous results"
+outside; nobody publishes 1451–1600.
+
+**Consequences.** (1) `HijriRegional.ummAlQuraTable` now uses the table only for AH 1420–1450 (`ummAlQuraOfficialYears`)
+and the rule with its correction everywhere else; all tests unchanged (131/131; the announced-date years are inside
+the range). (2) ICU's `islamic-umalqura`, Apple's Foundation and the port (which copies the 301-entry table for
+parity) show, from 2029 onward, dates that disagree with Saudi Arabia's rule in about a third of the months; this is a
+defect to report upstream (ICU/CLDR) and a deliberate divergence for the port to take. (3) The other agent's table
+"needs no correction" only in the sense that a table agrees with itself; against the official rule it is wrong for
+1451–1600, and the "2100 more months" are these synthetic ones (1420–1600 is 2,172 months). The question to put to
+the other agent: which data did it compare against, over which years, and what does its rule give for 1446-6 and for
+the 1451–1600 months listed in `ummalqura_table_sweep.txt`?
+
+### Round 9 (2026-11-11): what the Umm al-Qura table is outside AH 1420–1450
+
+Three things arrived on the same day: the user looked up KACST's site by hand, the other agent sent its "Round 4"
+request (`Docs/TEMP_Islamic_References_Request.md` on `port/islamic-family`, commit `5396bd74`) with two rules of its
+own, and we compared two more tables. Our answer to the request is in swift-foundation,
+`Docs/TEMP_Islamic_References/round-4/`.
+
+**1. KACST's site publishes ICU's dates after AH 1450 (official).** Looked up by the user in a browser on
+ummulqura.org.sa (its data endpoints are disallowed to programs by robots.txt), in two sittings on 2026-11-11:
+1 Rabi II 1451, 1 Rajab 1451, 1 Muharram 1458, 1 Rajab 1470, 1 Shawwal 1483, 1 Jumada I 1496, then 1 Dhu al-Qa'da
+1451, 1 Ramadan 1453, 1 Shawwal 1454. Each is a month where ICU's table and today's rule differ by a day with a clear
+margin; the site showed ICU's date in all nine, which include all five of the other agent's list. One month before
+AH 1420 was looked up as well: 1 Muharram 1400 is 1979-11-21 on the site, ICU's date, where .NET and the rule
+documented for those years give 1979-11-20 (part 3). So the site appears to serve the same 1300–1600 data as ICU, at
+least for AH 1318–1500; ten months are a sample, not the whole table.
+
+**2. The other agent's two rules, checked in our engine** (`CrescentUmmAlQuraRound4Check`, env `UQ_ROUND4_OUT`; one row
+per month in `Research/crescent/round6-raw/uq_round4_check.csv`; rows are labelled by the month whose length is
+decided, one month earlier than the Round 8 sweep, which labels by the month that starts).
+
+| Months (AH) | Count | Our rule | Its current rule | Its fitted table rule |
+|---|---|---|---|---|
+| 1300/01–1419/12 | 1,440 | 943 | 942 | **1,438** |
+| 1420/01–1422/12 | 36 | 34 | 33 | 24 |
+| 1423/01–1450/12 | 336 | 334 | **336** | 227 |
+| 1451/01–1600/11 | 1,799 | 1,175 | 1,176 | **1,799** |
+
+*Its current rule* (Mecca 21.4225° N, 39.8256° E, 295 m; the new moon before the geometric sunset; at the moment the
+sun's centre is 34′ + dip = 1.2087° below the horizon, the moon's topocentric centre at or above that same line) needs
+no correction for AH 1423–1450. Ours misses two months there: Jumada I 1427 (the new moon 65 s before our −50′ sunset
+but 2.9 min after the geometric one; table 30 days) and Jumada I 1446, our one named correction (our moon sets 4 s
+before our sun; with one line for both bodies the moon is 0.034° above it; table 29 days). Its closest calls in our
+engine are 7 s and 9 s (Rajab 1446 and Jumada I 1446). The new-moon limit is not fixed by the table: any depression of
+the sun's centre from 0 to about 36′ gives the same 336. **Its definitions are better than ours.**
+
+*Its fitted table rule* (at the geometric sunset in Mecca: 29 days if the new moon came before 00:00 Mecca time of
+that day, or if the moon is at least 5.5 h old and its topocentric centre, without refraction, sets at least 19.515 min
+after the sun's centre) gives every month of 1451–1600/11 and all but two of 1300–1419. The two: Muharram 1364
+(evening 1945-01-14; table 29; moon 9.80 h old, lag 19.385 min, 8 s under the limit) and Shawwal 1365 (evening
+1946-09-25; table 30; moon 6.43 h old, lag 20.511 min). Windows in which every other month still matches, ours against
+its own: lag 19.4997–19.5277 min (it: 19.50–19.53), age 5.344–5.641 h (it: 5.35–5.64), start of day from 3.4 min before
+to 1.2 min after 00:00 Mecca time. Of the 844 months of 29 days in 1451–1600, 510 pass only the age-and-lag test, 22
+only the start-of-day test, 312 both. The two engines agree to the second, but both use the same published series
+(Meeus, Calendrical Calculations), so this shows the fit is reproducible, not that another lunar theory would agree.
+The lag window is 1.7 s wide among about 1,650 months it decides, about what chance leaves; the number is fitted. No
+published text describes this rule (none).
+
+**3. Microsoft's .NET table (other).** `UmAlQuraCalendar.cs`, dotnet/runtime commit `60685192`, MIT; its comment: "These
+data are taken from Tables/Excel/UmAlQura.xls"; Microsoft Learn: "uses a table-based algorithm licensed from the Saudi
+government". AH 1318–1500. Month starts computed from it: `round6-raw/dotnet-umalqura/dotnet_first_days.csv`; rules
+against it (`UQ_FIRSTDAYS_CSV`): `round6-raw/dotnet-umalqura/dotnet_rules_check.txt`.
+
+| Years (AH) | Month starts equal to ICU's | What .NET's table follows |
+|---|---|---|
+| 1318–1355 | 85 of 456 | the day after the UTC date of the new moon, 456/456 |
+| 1356–1391 | 80 of 432 | the same, 432/432 |
+| 1392–1419 | 61 of 336 | the same, 336/336; this is the rule van Gent documents for these years |
+| 1420–1450 | 372 of 372 | the printed official table |
+| 1451–1500 | 389 of 600 | today's rule with the other agent's definitions, 600/600 (ours 599) |
+
+Where they differ, .NET is one day earlier than ICU (two days in 17 months before 1420). In all twelve test months
+after 1450 (the ten of our list, which include the user's six, and two more from the other agent's list) .NET has the
+rule's date and ICU the later one.
+So two tables that both claim a Saudi source are two different computations outside 1420–1450: .NET's is the
+documented rule of each period; ICU's is the fitted rule everywhere. KACST's site sides with ICU's in the nine
+months checked after 1450 and in the one checked before 1420. Before 1420, ICU's table differs from the documented 1392–1419 rule in 275 of 336 month starts (for
+example 1 Muharram 1400: ICU and KACST's site today 1979-11-21, .NET 1979-11-20); which date the Saudi calendar printed
+in 1979 was **not checked against a source of that time** (none).
+
+**4. ICU's own record (other).** Ticket ICU-10695, read through the tracker's public interface (robots.txt allows it):
+"Unable to use the http://www.ummulqura.org.sa/ site to validate the days-in-month table I reached out to KACST"
+(2014-04-21); "We have successfully contacted KASCT team and got the official data from year 1300 to 1600. It seems the
+website was not updated with all the data correctly" (2014-06-17); "it matches the Java v8 JDK results now from years
+1300-1600" (2014-06-17). Its attachment `HIJRA.TXT` (`round6-raw/icu-10695/`) equals ICU's table in all 3,611 month
+lengths and the start date, and is in the format of Java's Hijrah properties file. KACST is not quoted in the ticket.
+
+**Consequences.**
+1. `HijriRegional` uses the Umm al-Qura table for AH 1300–1600 again (the Round 8 restriction was never committed and
+   is undone). Our position for the port: keep ICU's table unchanged; it is what KACST's site shows today and what ICU,
+   Java and Apple ship. The disagreement with .NET is a recorded open point, not a divergence to take.
+2. The spec and the identifier note are back to their committed text; the Round 8 work item for `.islamicUmmAlQura`
+   is withdrawn. It was never delivered.
+3. To do, not done: take the other agent's definitions into `CrescentRules.ummAlQura`, which removes the correction
+   for 1446-6 (needs the user's go; it changes a verified rule).
+4. Two data files had Windows line endings (found by the other agent): `crescent_official_dates.csv` (633 lines) and
+   `announced_dates_2009_2026.csv` (all 1,767). Normalised in both repositories; our tests split on any line ending
+   and never saw it.
+
+**Open.** (a) Which dates Saudi Arabia will print for AH 1451: nothing on the web can settle it; the printed table
+ends at AH 1450 (May 2029). (b) AH 1501–1600 has no publication at all; only the fitted rule and ICU's ticket stand
+behind it. (c) Which day the Saudi calendar printed as 1 Muharram 1400 in 1979 (a source of that time would show
+whether KACST's site and ICU, or .NET and the documented rule, give the calendar as it was). Closed by the user's
+second sitting: the other agent's five months, and one month before AH 1420.
+
+**What Round 8 got wrong, plainly.** It concluded from a 65% match with today's rule that the table was nobody's
+calendar, without re-reading the round 1 record, which already named KACST's site (AH 1318–1500), the ICU ticket and
+.NET; and it did not look at the direction of its own misses. The user's question on 2026-11-11 ("can we find official
+KACST tables instead of ICU's?") is what brought the round 1 record back.
