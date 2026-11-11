@@ -653,3 +653,101 @@ second sitting: the other agent's five months, and one month before AH 1420.
 calendar, without re-reading the round 1 record, which already named KACST's site (AH 1318–1500), the ICU ticket and
 .NET; and it did not look at the direction of its own misses. The user's question on 2026-11-11 ("can we find official
 KACST tables instead of ICU's?") is what brought the round 1 record back.
+
+### Round 10 (2026-11-11): the Diyanet corrections re-examined
+
+The user re-opened the five corrections ("sceptical ... not able to come up with a comprehensive formula and had to rely on
+corrections"). Everything was re-read from the round 1 notes on, Diyanet's maps were looked at again, and three new
+probes were run (end of `CrescentDiyanetProbe.swift`): `CrescentDiyanetRound10` (`D10_OUT`; every quantity behind each
+of the 707 decisions, ~3 min), `CrescentDiyanetRound10Precise` (`D10_PRECISE=1`; Moshier longitudes) and
+`CrescentDiyanetOldMethod` (`D10_OLD_OUT`, `D10_OLD_UNTIL`; what an observer at Mecca, in Morocco, at Ankara and
+Istanbul sees on day 29 for the months before 1980 or 1996). Data: `Research/crescent/round10-raw/`
+(`diyanet_decisions.csv`, `diyanet_before_1980.csv`, `diyanet_before_1996.csv`). No rule code was changed.
+
+**1. No single formula can exist, and the list itself shows it.** Each era's rule applied to every era's decisions
+(period by the calendar year of the first day):
+
+| Era | Months | Strict 1978 rule | 2009–2013 rule | 2016 rule |
+|---|---|---|---|---|
+| to 2008 | 373 | **370** | 287 | 342 |
+| 2009–2013 | 61 | 49 | **61** | 58 |
+| 2014–2016 | 38 | **38** | 31 | 36 |
+| 2017–2035 | 235 | 215 | 209 | **233** |
+
+Every disagreement of a foreign rule goes one way (the looser rule starts months Diyanet waited for, the stricter one
+refuses months Diyanet started). The same sky was decided in opposite ways: 21 Jan 2015, crescent on the North American
+mainland with +0.43° (Alaska +1.28°), Diyanet waited; 16 Oct 2012 and 4 Nov 2013, no American land in reach at all,
+Diyanet started; 29 May 2033, visible to 37.75° N at the date line and missing the mainland by 0.012°, Diyanet waits.
+The policy for a first visibility after 24:00 UTC changed in 2009, 2014 and 2017; a time-independent formula is
+impossible.
+
+**2. The 1978 rule begins with the 1980 calendar. Ramazan 1979 is not an exception to it.** Before 1980 Diyanet's
+list follows an older test. The simplest form that fits is: the moon sets at least 18.5 minutes after the sun at Mecca
+(standard sunset and moonset). Published decisions reproduced, by calendar year of the first day:
+
+| First day in | Months | 1978 rule | Older test |
+|---|---|---|---|
+| 1960–1977 | 222 | 175 | 209 |
+| 1978 | 13 | 10 | **13** |
+| 1979 | 12 | 11 | **12** |
+| 1980 | 12 | **12** | 9 |
+| 1981 | 13 | 12 | 11 |
+| 1982–1995 | 173 | 172 | 132 |
+
+Where the two tests disagree, Diyanet follows the older one in 39 of 44 months of 1960–1977 and in 4 of 4 of 1978–1979,
+and the 1978 rule in 46 of 48 months of 1980–1995. The 14 decisions of the verified range with a first day before 1980
+(1 Dec 1978 … 20 Dec 1979) are all reproduced by the older test. So the 1979 calendar was still computed the old way
+(it was printed before the conference of 27–30 Nov 1978; van Gent has the rule from AH 1400; the same thing happened with
+the 2016 calendar and the 2016 congress), and Ramazan 1399, where the elongation reached 8° 5.9 hours before the cut-off,
+is an ordinary result of that method (moon setting 13.2 minutes after the sun at Mecca). Caveats: in 1979 itself
+Ramazan is the only month in which the two tests differ; and the older test is a description, not a reconstruction.
+For 1978–1979 many forms give 25 of 25 (limit 18.1–18.7 min at Mecca; 23.2–29.4 min or altitude 4.7–5.7° in Morocco;
+14.8–20.3 min at Ankara); over 1960–1979 the Mecca form is best (234 of 247, limit 18.4–18.6 min; Morocco forms 89–90%),
+over 1925–1959 it needs a limit of about 22.5 min (93%), and before 1925 nothing passes 75%. Its 13 misses of 1960–1979
+suggest a second condition (five refusals with an elongation under 5.6°). Diyanet's 1925–1979 list equals ICU's Umm
+al-Qura table in about 90% of month starts, the .NET table in 16–26%.
+
+**3. November 1990 (AH 1411-5).** The elongation reaches 8° at 23:59:06 UTC with our series, 23:59:14 with Moshier's
+longitudes: 46 seconds before the cut-off. In dynamical time (delta-T 57.5 s), the scale in which the almanacs of the
+time tabulated the moon, it is 12 seconds after. A pre-2009 program that compared dynamical time with 24:00 would refuse
+this month, and nothing else in 1980–2008 changes (nearest starts: 5.3, 9.7, 10.1, 11.0 and 13.8 minutes before the
+cut-off; nearest refusal 2.6 minutes after). Diyanet's maps from 2009 on are in universal time (ours + 15 s), so this
+would be a property of the older program only. One decision supports it; nothing can test it further.
+
+**4. June 1981 (AH 1401-8).** Refused with the elongation reaching 8° 14.1 minutes before the cut-off (13.9 with our
+series), while July 1993 started with 13.8. No clock offset and no threshold can give both. Of the 48 months of
+1980–1995 in which the older test and the 1978 rule differ, June 1981 and November 1990 are the only two where Diyanet
+sided with the older test; in both the moon set with or before the sun at Mecca (lag 2.2 and −7.6 minutes).
+
+**5. Since 2017.** Of the 145 decisions in which the elongation reaches 8° after 24:00 UTC, 28 can depend on the thresholds at all. With
+May 2023 and March 2032 set aside, the rule as it stands reproduces every other one. Shifting the altitude and the
+elongation thresholds together (±0.5°, steps of 0.005°) reproduces neither month without breaking others, whether one
+or both are required. The altitude side is pinned from both directions by four decisions in three computation runs:
+started with +0.087° (Nov 2017, tip of the Alaska Peninsula) and +0.013° (Jun 2021, Oregon), refused with −0.012°
+(May 2033, Mexico) and −0.042° (Feb 2026, the same tip). March 2032 (elongation +0.030°) conflicts with June 2021
+(+0.012°, started) by about two minutes of sunset; its Wellington margin of +16 minutes lies below the smallest margin
+of any start (+24, Feb 2031). May 2023 (altitude +0.222°, elongation +0.230° at 59.1° N) conflicts with May 2030
+(+0.083°, started, also Alaska only) by about eighteen minutes. The Wellington clause is real: three refusals depend on
+it alone (Apr 2025, May 2026, Jun 2027, the new moon 100 to 133 minutes after dawn). South America counts: Nov 2023
+started on Chile alone (+0.125°).
+
+**6. Diyanet's maps cannot be the input of the decision.** Its line near America is a smooth freehand curve. On the May
+2023 map it bulges 20 to 30° of longitude east of the true zone, over open ocean where the sun had set before the
+elongation reached 8°; on the March 2032 map it shades most of western Alaska in a month Diyanet refused. The plotted
+points on the line are exact and match ours.
+
+**Where the five corrections stand.**
+
+| Month | Finding | Status |
+|---|---|---|
+| Ramazan 1399 (Jul 1979) | the 1978 rule was not yet in use; the older test gives the published date | not an exception: an era boundary set one year early |
+| AH 1411-5 (Nov 1990) | 46 s before the cut-off in UT, 12 s after in dynamical time | explained if the pre-2009 program used dynamical time; one data point |
+| AH 1401-8 (Jun 1981) | contradicts July 1993 by 0.3 minutes the wrong way | a real inconsistency in the published list |
+| AH 1444-11 (May 2023) | no thresholds refuse it and start May 2030 | a real inconsistency in the published list |
+| AH 1453-12 (Mar 2032) | two minutes against June 2021 on one side, 16 against 24 minutes on the other | below what the published numbers can resolve |
+
+**Proposals (not applied; the user decides).** (a) Start the 1978 rule at first days from 1 Jan 1980 and use the older
+test before: 703 of 707 without the 1979 correction. (b) Compare the cut-off in dynamical time for 1980–2008: 704 of
+707 without the 1990 correction. (c) Keep June 1981, May 2023 and March 2032 as named corrections, with the reasons
+above. Sources that could still settle them: Diyanet's printed "Kameri Ay Başları Hesap ve Haritaları" for each run
+(its tables give the computed points in five columns) and the printed calendars of 1981.

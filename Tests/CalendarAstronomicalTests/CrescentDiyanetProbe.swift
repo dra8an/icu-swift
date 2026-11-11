@@ -1906,3 +1906,212 @@ private func loadStartsFromEnv(_ env: [String: String]) -> [Int: Int64]? {
         for (k, v) in tally.sorted(by: { $0.key < $1.key }) { print("UQ4OTHER|\(k)|months \(v[0])|rule A \(v[1])|rule B \(v[2])|our rule \(v[3])|day after the new moon's UTC date \(v[4])") }
     }
 }
+
+/// Round 10 (2026-11-11): one row per Diyanet decision AH 1399–1457 with every quantity the era rules use, for an
+/// offline study of the five corrections (definitions varied together, the 2009–2013 rule against the 2017 rule, the
+/// timing of the cut-off). Env: DIYANET_HISTORY, DIYANET_CSV, D10_OUT (output CSV).
+@Suite struct CrescentDiyanetRound10 {
+    /// Apparent altitude of the moon's centre (topocentric, with refraction), or nil when it is far below the horizon.
+    static func apparent(_ t: Moment, _ loc: Location) -> Double? {
+        let geo = Astronomical.lunarHorizontal(t, location: loc).altitude
+        guard geo >= 1 else { return nil }
+        let topo = geo - Astronomical.lunarParallax(altitude: geo, moment: t)
+        return topo + Astronomical.refraction(atTrueAltitude: topo)
+    }
+
+    /// Margins (altitude − 5, elongation − 8) at the sunset of the local evening of `day` at each point; the best
+    /// min of the two, where it is, and the points that no other point beats in both margins.
+    struct Coast {
+        var best = -99.0, lat = 0.0, lon = 0.0, alt = 0.0, el = 0.0, sunset = Moment(0)
+        var frontier: [(alt: Double, el: Double, lat: Double)] = []
+        mutating func add(alt: Double, el: Double, lat: Double, lon: Double, sunset s: Moment) {
+            let m = min(alt, el)
+            if m > best { (best, self.lat, self.lon, self.alt, self.el, sunset) = (m, lat, lon, alt, el, s) }
+            if frontier.contains(where: { $0.alt >= alt && $0.el >= el }) { return }
+            frontier.removeAll { $0.alt <= alt && $0.el <= el }
+            frontier.append((alt, el, lat))
+        }
+        var text: String { frontier.sorted { $0.el > $1.el }.map { String(format: "%.3f:%.3f:%.2f", $0.alt, $0.el, $0.lat) }.joined(separator: "|") }
+    }
+
+    static func margins(_ day: RataDie, _ conj: Moment, _ midnight: Moment, _ points: [(lat: Double, lon: Double)]) -> Coast {
+        var c = Coast()
+        for p in points {
+            let loc = Location(latitude: p.lat, longitude: p.lon, elevation: 0, utcOffset: 0)
+            guard let s = Astronomical.sunsetUT(nearLocalNoonOf: day, location: loc), s >= midnight, s > conj, s - conj < 3 else { continue }
+            let el = Astronomical.geocentricElongation(s) - 8
+            guard el > -1.5, let a = apparent(s, loc) else { continue }
+            c.add(alt: a - 5, el: el, lat: p.lat, lon: p.lon, sunset: s)
+        }
+        return c
+    }
+
+    @Test func table() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let out = env["D10_OUT"], let starts = loadStartsFromEnv(env) else { return }
+        let y2009 = rd(2009, 1, 1), y2014 = rd(2014, 1, 1), y2017 = rd(2017, 1, 1)
+        let f = CrescentFixtureExport.f, date = CrescentFixtureExport.date, utc = CrescentFixtureExport.utc
+        // The American mainland's western edge, split into Alaska, the rest of North and Central America, South America.
+        var alaska: [(lat: Double, lon: Double)] = [], north: [(lat: Double, lon: Double)] = [], south: [(lat: Double, lon: Double)] = []
+        for (i, lon) in CrescentRules.americanWestCoast.enumerated() {
+            let lat = 71.95 - 0.05 * Double(i)
+            if lat >= 54.8 && lon < -141 { alaska.append((lat, lon)) } else if lat >= 7.5 { north.append((lat, lon)) } else { south.append((lat, lon)) }
+        }
+        let dateLine: [(lat: Double, lon: Double)] = (-352...352).map { (Double($0) / 4, -179.999) }
+        var lines = ["ah_year,ah_month,candidate_first_day,official_days,period,rule_days,conjunction_utc,e8_utc,e8_minus_midnight_min,elongation_at_midnight,main_alt_margin,main_alt_lat,wellington_min,alaska_best,alaska_lat,alaska_lon,alaska_alt,alaska_el,alaska_sunset_utc,alaska_frontier,north_best,north_lat,north_lon,north_alt,north_el,north_frontier,south_best,south_lat,south_lon,south_alt,south_el,south_frontier,dateline_best,dateline_lat,dateline_alt,dateline_el,dateline_north_limit,dateline_south_limit,dateline_n10_best"]
+        for idx in starts.keys.sorted() where idx >= 1399 * 12 {
+            guard let p = starts[idx - 1], let s = starts[idx] else { continue }
+            let day = RataDie(p + 28), midnight = Moment(Double(p + 29))
+            let period = s < y2009 ? "A" : (s < y2014 ? "B" : (s < y2017 ? "C" : "D"))
+            let rule = CrescentRules.diyanetMonthLength(start: RataDie(p), next: (idx / 12, idx % 12 + 1), corrections: false)
+            let before = Astronomical.newMoonBefore(midnight + 0.5)
+            let recent = midnight.inner + 0.5 - before.inner < 3
+            let conj = recent ? before : Astronomical.newMoonAtOrAfter(midnight + 0.5)
+            // The moment the geocentric elongation reaches 8 degrees after the conjunction.
+            var a = conj.inner, b = conj.inner + 2.5
+            for _ in 0..<50 { let m = (a + b) / 2; if Astronomical.geocentricElongation(Moment(m)) >= 8 { b = m } else { a = m } }
+            let e8 = Moment((a + b) / 2)
+            let eMid = Astronomical.geocentricElongation(midnight)
+            // Main test: the best apparent altitude along the line where the sun sets at 00:00 UTC.
+            var mainAlt = -99.0, mainLat = 0.0
+            if recent && conj < midnight {
+                for k in -880...880 {
+                    let lat = Double(k) / 10
+                    guard let lon = CrescentRules.sunsetLongitude(at: midnight, latitude: lat),
+                          let alt = Self.apparent(midnight, Location(latitude: lat, longitude: lon, elevation: 0, utcOffset: 0)) else { continue }
+                    if alt - 5 > mainAlt { (mainAlt, mainLat) = (alt - 5, lat) }
+                }
+            }
+            var wellington = Double.nan
+            if let dawn = Astronomical.dawnUT(after: Moment(Double(day.dayNumber) + 0.25), location: CrescentRules.wellington, depression: 18) {
+                wellington = (dawn - conj) * 1440
+            }
+            var row = "\(idx / 12),\(idx % 12 + 1),\(date(p + 29)),\(s - p),\(period),\(rule),\(utc(conj)),\(utc(e8)),\(f((e8 - midnight) * 1440, 2)),\(f(eMid, 4)),\(mainAlt > -90 ? f(mainAlt, 3) : ""),\(mainAlt > -90 ? f(mainLat, 1) : ""),\(wellington.isNaN ? "" : f(wellington, 1))"
+            // After-midnight tests only where they can matter: the elongation is under 8.6 at 00:00 UTC, or the main altitude fails.
+            if recent && (eMid < 8.6 || mainAlt < 0.3) {
+                for (i, set) in [alaska, north, south].enumerated() {
+                    let c = Self.margins(day, conj, midnight, set)
+                    if c.best > -90 {
+                        row += ",\(f(c.best, 3)),\(f(c.lat, 2)),\(f(c.lon, 2)),\(f(c.alt, 3)),\(f(c.el, 3))" + (i == 0 ? ",\(utc(c.sunset))" : "") + ",\(c.text)"
+                    } else { row += i == 0 ? ",,,,,,," : ",,,,,," }
+                }
+                let d = Self.margins(day, conj, midnight, dateLine)
+                var northLimit = -99.0, southLimit = 99.0, n10 = -99.0
+                for p2 in dateLine {
+                    let loc = Location(latitude: p2.lat, longitude: p2.lon, elevation: 0, utcOffset: 0)
+                    guard let ss = Astronomical.sunsetUT(nearLocalNoonOf: day, location: loc), ss >= midnight, ss > conj, ss - conj < 3 else { continue }
+                    let el = Astronomical.geocentricElongation(ss) - 8
+                    guard el > -1.5, let al = Self.apparent(ss, loc) else { continue }
+                    let m = min(al - 5, el)
+                    if m >= 0 { northLimit = max(northLimit, p2.lat); southLimit = min(southLimit, p2.lat) }
+                    if p2.lat >= 10 { n10 = max(n10, m) }
+                }
+                if d.best > -90 {
+                    row += ",\(f(d.best, 3)),\(f(d.lat, 2)),\(f(d.alt, 3)),\(f(d.el, 3)),\(northLimit > -90 ? f(northLimit, 2) : ""),\(southLimit < 90 ? f(southLimit, 2) : ""),\(n10 > -90 ? f(n10, 3) : "")"
+                } else { row += ",,,,,,," }
+            } else {
+                row += String(repeating: ",", count: 26)
+            }
+            lines.append(row)
+        }
+        try lines.joined(separator: "\n").appending("\n").write(toFile: out, atomically: true, encoding: .utf8)
+        print("D10|rows \(lines.count - 1)|\(out)")
+    }
+}
+
+/// Round 10: the moment the geocentric elongation reaches 8 degrees for the 1978–2008 decisions nearest the 24:00 UTC
+/// cut-off, with our series and with Moshier's longitudes (DE404 / VSOP87) and our latitude. Env: D10_PRECISE=1.
+@Suite struct CrescentDiyanetRound10Precise {
+    static func elongationMoshier(_ t: Moment) -> Double {
+        let beta = Astronomical.lunarLatitude(Astronomical.julianCenturies(t))
+        var d = MoshierLunar.lunarLongitude(at: t) - MoshierSolar.solarLongitude(at: t)
+        d = (d + 540).truncatingRemainder(dividingBy: 360) - 180
+        return acos(min(1, max(-1, cos(beta * .pi / 180) * cos(d * .pi / 180)))) * 180 / .pi
+    }
+    static func reach8(after conj: Moment, _ f: (Moment) -> Double) -> Moment {
+        var a = conj.inner + 0.05, b = conj.inner + 2.5
+        for _ in 0..<60 { let m = (a + b) / 2; if f(Moment(m)) >= 8 { b = m } else { a = m } }
+        return Moment((a + b) / 2)
+    }
+    @Test func nearCutoff() {
+        guard ProcessInfo.processInfo.environment["D10_PRECISE"] != nil else { return }
+        // (candidate first day, published outcome)
+        let cases: [(Int, Int, Int, String)] = [(1981, 6, 3, "wait"), (1993, 7, 20, "START"), (1989, 11, 29, "START"), (2005, 5, 9, "START"),
+            (1982, 9, 18, "START"), (2006, 3, 30, "START"), (1990, 11, 18, "wait"), (2002, 7, 11, "wait"), (1993, 10, 16, "wait")]
+        for c in cases {
+            let midnight = Moment(Double(rd(c.0, c.1, c.2)))
+            let conj = Astronomical.newMoonBefore(midnight + 0.5)
+            let ours = Self.reach8(after: conj) { Astronomical.geocentricElongation($0) }
+            let precise = Self.reach8(after: conj, Self.elongationMoshier)
+            let jd = midnight.inner + 1721424.5
+            let dT = MoshierSolar.deltaTSeconds(jd)
+            print(String(format: "D10P|first day %04d-%02d-%02d|published %@|8 deg, our series: %+8.1f s|Moshier longitudes: %+8.1f s|delta-T %.1f s|Moshier + delta-T: %+8.1f s",
+                         c.0, c.1, c.2, c.3, (ours - midnight) * 86400, (precise - midnight) * 86400, dT, (precise - midnight) * 86400 + dT))
+        }
+    }
+}
+
+/// Round 10: what an observer at a few fixed places sees at sunset on day 29 for every Diyanet decision before 1980
+/// (AH 1318–1400), to look for the method used before the 1978 rule (Keleş 2016 p. 375: until 1974 the visibility for
+/// an observer on a 4,300 m peak in Morocco). Env: DIYANET_HISTORY, DIYANET_CSV, D10_OLD_OUT.
+@Suite struct CrescentDiyanetOldMethod {
+    static func falling(from lo: Double, to hi: Double, target: Double, _ f: (Moment) -> Double) -> Moment? {
+        var a = lo, b = hi
+        guard f(Moment(a)) > target, f(Moment(b)) <= target else { return nil }
+        for _ in 0..<50 { let m = (a + b) / 2; if f(Moment(m)) > target { a = m } else { b = m } }
+        return Moment((a + b) / 2)
+    }
+    @Test func table() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let out = env["D10_OLD_OUT"], let starts = loadStartsFromEnv(env) else { return }
+        let f = CrescentFixtureExport.f, date = CrescentFixtureExport.date
+        let sites: [(String, Location)] = [
+            ("morocco", Location(latitude: 31.06, longitude: -7.92, elevation: 0, utcOffset: 0)),      // Toubkal, the highest peak
+            ("ankara", Location(latitude: 39.93, longitude: 32.86, elevation: 0, utcOffset: 0)),
+            ("istanbul", Location(latitude: 41.06, longitude: 29.06, elevation: 0, utcOffset: 0)),     // Kandilli
+            ("mecca", Location(latitude: 21.4225, longitude: 39.8256, elevation: 0, utcOffset: 0)),
+        ]
+        let dip = acos(6.372e6 / (6.372e6 + 4300.0)) * 180 / .pi   // horizon dip from 4,300 m, degrees
+        var header = "ah_year,ah_month,first_day,evening,official_days,age_hours_at_00utc,e8_minus_midnight_min"
+        for (n, _) in sites { header += ",\(n)_age_h,\(n)_lag_min,\(n)_alt_geo,\(n)_alt_topo,\(n)_elong,\(n)_daz,\(n)_width_arcmin" }
+        header += ",morocco_peak_alt_topo,morocco_peak_elong,morocco_peak_lag_min"
+        var lines = [header]
+        let limit = rd(Int(env["D10_OLD_UNTIL"] ?? "") ?? 1980, 2, 1)
+        for idx in starts.keys.sorted() where idx > 1318 * 12 {
+            guard let p = starts[idx - 1], let s = starts[idx], s < limit else { continue }
+            let day = RataDie(p + 28), midnight = Moment(Double(p + 29))
+            let before = Astronomical.newMoonBefore(midnight + 0.5)
+            let conj = midnight.inner + 0.5 - before.inner < 3 ? before : Astronomical.newMoonAtOrAfter(midnight + 0.5)
+            var a = conj.inner, b = conj.inner + 2.5
+            for _ in 0..<50 { let m = (a + b) / 2; if Astronomical.geocentricElongation(Moment(m)) >= 8 { b = m } else { a = m } }
+            var row = "\(idx / 12),\(idx % 12 + 1),\(date(s)),\(date(p + 28)),\(s - p),\(f((midnight - conj) * 24, 3)),\(f(((a + b) / 2 - midnight.inner) * 1440, 1))"
+            var rowPeak = ",,,"
+            for (n, loc) in sites {
+                guard let ss = Astronomical.sunsetUT(nearLocalNoonOf: day, location: loc) else { row += ",,,,,,,"; continue }
+                let geo = Astronomical.lunarHorizontal(ss, location: loc)
+                let topo = geo.altitude - Astronomical.lunarParallax(altitude: geo.altitude, moment: ss)
+                let sun = Astronomical.solarHorizontal(ss, location: loc)
+                let el = Astronomical.geocentricElongation(ss)
+                var daz = geo.azimuth - sun.azimuth; daz = (daz + 540).truncatingRemainder(dividingBy: 360) - 180
+                let sd = 0.2725 * Astronomical.lunarParallaxHorizontal(ss) * 60          // arcminutes
+                let width = sd * (1 - cos(el * .pi / 180))                               // crescent width, arcminutes
+                let ms = Astronomical.moonsetUT(after: ss - 8.0 / 24, location: loc)
+                row += ",\(f((ss - conj) * 24, 3)),\(ms.map { f(($0 - ss) * 1440, 2) } ?? ""),\(f(geo.altitude, 3)),\(f(topo, 3)),\(f(el, 3)),\(f(daz, 3)),\(f(width, 3))"
+                if n == "morocco" {
+                    // The same place from 4,300 m: the sun sets when its upper limb reaches the lowered horizon.
+                    let noon = Double(day.dayNumber) + 0.5 - loc.longitude / 360
+                    let sunAlt: (Moment) -> Double = { Astronomical.solarHorizontal($0, location: loc).altitude }
+                    let moonAlt: (Moment) -> Double = { Astronomical.topocentricLunarHorizontal($0, location: loc).altitude }
+                    if let peak = Self.falling(from: noon, to: noon + 0.5, target: -(50.0 / 60 + dip), sunAlt) {
+                        let moonSet = Self.falling(from: noon + 2.0 / 24, to: noon + 0.6, target: -(50.0 / 60 + dip), moonAlt)
+                        rowPeak = ",\(f(moonAlt(peak) + dip, 3)),\(f(Astronomical.geocentricElongation(peak), 3)),\(moonSet.map { f(($0 - peak) * 1440, 2) } ?? "")"
+                    } else { rowPeak = ",,," }
+                }
+            }
+            row += rowPeak
+            lines.append(row)
+        }
+        try lines.joined(separator: "\n").appending("\n").write(toFile: out, atomically: true, encoding: .utf8)
+        print("D10OLD|rows \(lines.count - 1)|\(out)")
+    }
+}
