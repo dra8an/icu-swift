@@ -751,3 +751,16 @@ test before: 703 of 707 without the 1979 correction. (b) Compare the cut-off in 
 707 without the 1990 correction. (c) Keep June 1981, May 2023 and March 2032 as named corrections, with the reasons
 above. Sources that could still settle them: Diyanet's printed "Kameri Ay Başları Hesap ve Haritaları" for each run
 (its tables give the computed points in five columns) and the printed calendars of 1981.
+
+**Decision and what was applied (2026-11-11, later).** The user chose (a) and (c) and keeps November 1990 as a
+correction. Applied: `DiyanetEra.before1980` (first days before 1 Jan 1980, rata die 722815) decides by the older test
+(`diyanetOlderTestMinimumLagMinutes` = 18.5, sunset and moonset at Mecca as in `CrescentRules.evening`), the former
+`before2009` is `years1980to2008`, and `diyanetCorrections` holds four months (1401-8, 1411-5, 1444-11, 1453-12).
+`CrescentDiyanetPublishedTests` asserts the 1980 boundary and prints
+`DIYANET|published decisions 707|era rules 703|with corrections 707|rule misses: AH 1401-8 AH 1411-5 AH 1444-11 AH 1453-12`.
+The fixture `crescent_astronomy_fixture.csv` was regenerated (`FIXTURE_OUT`, `ANNOUNCED_CSV`, `MAPS_CSV`): 359 Diyanet rows
+change only their era label, the 14 rows before 1980 gain the Mecca sunset, moonset and lag, `rule_days` of AH 1399-9 is
+30, and no other row changes. Inside the verified range the limit can be anywhere from 13.2 to 18.7 minutes (1 Ramazan
+1399 waits with 13.19, 1 Safer 1400 starts with 18.73). The spec (§1 step 0, §4, §5) and the identifier note follow.
+For the port: `Docs/TEMP_Islamic_References/round-5/` (README and `data/diyanet_older_test_1960_1995.csv`) and the six
+refreshed files of `round-3/`.

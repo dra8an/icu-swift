@@ -1,6 +1,6 @@
 # Islamic crescent rules — session handoff
 
-Last update: 2026-11-11, afternoon. Read this file first, then `Docs/CRESCENT_RULES_RESULTS.md` (the evidence,
+Last update: 2026-11-11, late afternoon. Read this file first, then `Docs/CRESCENT_RULES_RESULTS.md` (the evidence,
 rounds 1–10), then `Docs/CRESCENT_DIYANET_SPEC.md` and `Docs/CRESCENT_ISLAMIC_IDENTIFIER_NOTE.md` (what the port should do).
 
 ## 1. What this work is
@@ -23,7 +23,7 @@ worktree; the user commits and pushes it. The user has said that design decision
 
 | What | Path / branch / state (checked 2026-11-09 late evening) |
 |---|---|
-| **icu4swift** | `/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift`, branch `islamic-crescent` (off `main` 8fb6b3f), tracking `origin/islamic-crescent` (`git@github.com:dra8an/icu-swift.git`). Pushed commits: `fc4417e` (the whole crescent work), `7ac6000` (handoff record), `49925c1` (self-contained: announced-dates CSV, scripts, §6b), `3d21044` (Round 9, 2026-11-11). **Uncommitted, ours:** `Docs/CRESCENT_HANDOFF.md`, `Docs/CRESCENT_RULES_RESULTS.md` (Round 10) and `Tests/CalendarAstronomicalTests/CrescentDiyanetProbe.swift` (three Round 10 suites). **Not ours, leave alone:** `Docs-Foundation/MASTER.md`, `Docs-Foundation/PORT_DIRECTION.md`, `Docs/HANDOFF.md` (old uncommitted edits from before this work). |
+| **icu4swift** | `/Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift`, branch `islamic-crescent` (off `main` 8fb6b3f), tracking `origin/islamic-crescent` (`git@github.com:dra8an/icu-swift.git`). Pushed commits: `fc4417e` (the whole crescent work), `7ac6000` (handoff record), `49925c1` (self-contained: announced-dates CSV, scripts, §6b), `3d21044` (Round 9, 2026-11-11), `d29e47c` (Round 10, 2026-11-11). **Uncommitted, ours** (the user's decision of 2026-11-11, see §6): the four crescent docs, `CrescentRules.swift`, `HijriRegional.swift`, the probe, `CrescentDiyanetPublishedTests.swift` and `crescent_astronomy_fixture.csv`. **Not ours, leave alone:** `Docs-Foundation/MASTER.md`, `Docs-Foundation/PORT_DIRECTION.md`, `Docs/HANDOFF.md` (old uncommitted edits from before this work). |
 | Astronomy engine | `Sources/AstronomicalEngine/CrescentAstronomy.swift`, `LunarSeriesTables.swift` (ICU4X-derived series, Apache-2.0) |
 | Rules | `Sources/CalendarAstronomical/CrescentRules.swift` (Diyanet eras + 5 corrections, Umm al-Qura rule + 1 correction, MABIMS, Egypt filters, 2,517-row American west-coast table), `HijriRegional.swift` (region → method dispatcher, Malaysia + 2 corrections, Indonesia, Odeh visibility) |
 | Permanent tests (all pass, ~10 s) | `Tests/CalendarAstronomicalTests/CrescentDiyanetPublishedTests.swift` (707/707), `CrescentUmmAlQuraPublishedTests.swift` (131/131), `HijriRegionalTests.swift` (dispatcher + announced-date report), `Tests/AstronomicalEngineTests/CrescentAstronomyTests.swift` |
@@ -31,7 +31,7 @@ worktree; the user commits and pushes it. The user has said that design decision
 | Test data (committed) | `crescent_official_dates.csv` (published first days: Diyanet AH 1398-12…1457-11, Umm al-Qura 1440–1450, Malaysia, Indonesia, Singapore, Egypt announcements), `announced_dates_2009_2026.csv` (moonsighting.com compilation, 1,766 rows), `crescent_astronomy_fixture.csv` (our engine's values per decision evening + Diyanet's printed map times) |
 | Scripts | `Docs/crescent-tools/` (coast-table generator from Natural Earth; moonsighting.com page parser) |
 | Local-only research | `Research/crescent/` — git-excluded via `.git/info/exclude`; `*-local-only/` folders are copyrighted (Diyanet maps and lists, JAKIM PDFs, moonsighting pages, Keleş article) — **never commit**. Raw outputs in `round1-raw/`, `round3-raw/`, `round6-raw/` (README in each). |
-| **swift-foundation worktree** | `/Users/draganbesevic/Projects/claude/swift-foundation-islamic`, branch `port/islamic-family`, in sync with origin at `4d302030` (our round 4, pushed by the user 2026-11-11, on top of the other agent's squashed rebase `5396bd74`). It is a linked worktree of the main clone, so **`git stash` entries are shared with the collation worktree**: check the entry's name before any `git stash pop`. Delivered: `Docs/TEMP_Islamic_References/` round 1 (`*.md`), `round-2/`, `round-3/`, `round-4/`. **Uncommitted, ours:** the new `Docs/Islamic_Crescent_Calendars.md` (see §6). The other agent's requests are in `Docs/TEMP_Islamic_References_Request.md` (newest round at the top). |
+| **swift-foundation worktree** | `/Users/draganbesevic/Projects/claude/swift-foundation-islamic`, branch `port/islamic-family`, our round 4 is `4d302030` (pushed 2026-11-11, on top of the other agent's squashed rebase `5396bd74`). It is a linked worktree of the main clone, so **`git stash` entries are shared with the collation worktree**: check the entry's name before any `git stash pop`. Delivered: `Docs/TEMP_Islamic_References/` round 1 (`*.md`), `round-2/`, `round-3/`, `round-4/`. Also ours: `Docs/Islamic_Crescent_Calendars.md` (a permanent guide, see §6). In sync with origin at `f7197446`. **Uncommitted, ours:** `round-5/` (new) and seven files of `round-3/` (see §6). The other agent's requests are in `Docs/TEMP_Islamic_References_Request.md` (newest round at the top). |
 | Main swift-foundation checkout | `/Users/draganbesevic/Projects/claude/swift-foundation`, branch `port/chinese` = frozen archive, not used for this work |
 
 The other agent pushes to `port/islamic-family` and sometimes **rebases it**. To pick up its changes: `git fetch origin
@@ -42,7 +42,7 @@ origin/port/islamic-family` — **first `git stash push -u -- Docs/TEMP_Islamic_
 
 - Build: `swift build` (~50 s; Xcode's default toolchain, Swift 6.2.x).
 - **The checks that matter** (~10 s): `swift test --filter 'CrescentDiyanetPublishedTests|CrescentUmmAlQuraPublishedTests|HijriRegionalTests|CrescentAstronomyTests'`
-  → 15 tests, 4 suites, all pass. Expected prints: `DIYANET|published decisions 707|era rules 702|with corrections 707|…`,
+  → 15 tests, 4 suites, all pass. Expected prints: `DIYANET|published decisions 707|era rules 703|with corrections 707|…`,
   `UMMALQURA|…|rule 130|with corrections 131|…`, `REGIONAL|Umm al-Qura table|131/131`, `Malaysia (MY)|98/98 …`,
   `Indonesia (ID)|25/25`, `Diyanet (TR)|707/707`, `REGIONGROUP|…|77%`, `90%`, `81%`.
 - Full suite: `swift test` (~5 min). **Known pre-existing failure:** "Chinese Regression" (3 of 2,461 Hong Kong
@@ -67,7 +67,7 @@ measured; no rule is expected to reach 100% there.
 
 | Calendar | Method | Verified | Corrections | Test |
 |---|---|---|---|---|
-| **Diyanet (TR)** | era rules by Gregorian year of the first day: ≤2008 criterion met at a sunset before 00:00 UTC anywhere; 2009–2013 also after 00:00 UTC if the zone reaches 10° N west of 30° W; 2014–2016 none; 2017+ the 2016 rule (American mainland at 0.05°, conjunction before Wellington −18° dawn). Apparent altitude ≥ 5°, geocentric elongation ≥ 8°, no grid | **707/707**, AH 1399–1457; rule alone 702 | 5: 1399-9 (1979), 1401-8 (1981), 1411-5 (1990), 1444-11 (2023), 1453-12 (2032). **Round 10 re-examined them:** 1979 is an era boundary set a year early, 1990 fits a dynamical-time cut-off, the other three are real inconsistencies or below resolution; see §6 | `CrescentDiyanetPublishedTests` |
+| **Diyanet (TR)** | era rules by Gregorian year of the first day: ≤1979 the older test (moonset at least 18.5 min after sunset at Mecca); 1980–2008 criterion met at a sunset before 00:00 UTC anywhere; 2009–2013 also after 00:00 UTC if the zone reaches 10° N west of 30° W; 2014–2016 none; 2017+ the 2016 rule (American mainland at 0.05°, conjunction before Wellington −18° dawn). Apparent altitude ≥ 5°, geocentric elongation ≥ 8°, no grid | **707/707**, AH 1399–1457; rule alone 703 | 4: 1401-8 (1981), 1411-5 (1990), 1444-11 (2023), 1453-12 (2032). **Round 10 re-examined them** (the fifth, 1399-9 of 1979, was an era boundary set a year early and is now computed): 1990 fits a dynamical-time cut-off but stays a correction by the user's decision, the other three are real inconsistencies or below resolution; see §6 | `CrescentDiyanetPublishedTests` |
 | **Umm al-Qura (SA)** | the table for AH 1300–1600 as ICU has it (printed official table for 1420–1450; KACST's site shows its dates after 1450); rule (conjunction before sunset and moonset after sunset at the Kaaba) beyond the table | **131/131**, AH 1440–1450 | 1: 1446-6 (Dec 2024, moonset 4 s before sunset in our engine) | `CrescentUmmAlQuraPublishedTests`, `HijriRegionalTests` |
 | **Malaysia (MY)** | MABIMS 1992 to the 2021 takwim, MABIMS 2021 from 2022, at Tanjung Chinchin to AH 1443 then Pulau Perak, elongation between refracted positions | **98/98** | 2: 1443-10 (Labuan sighting override), 1449-8 (0.015°) | `HijriRegionalTests` |
 | **Indonesia (ID)** | MABIMS 2021 from Ramadan 1443 at Banda Aceh, geocentric altitude | **25/25** | 0 | `HijriRegionalTests` |
@@ -123,8 +123,8 @@ rebases.
 remaining three of the other agent's list (1 Dhu al-Qa'da 1451, 1 Ramadan 1453, 1 Shawwal 1454) and 1 Muharram 1400.
 All ten show ICU's date; `round-4/` and the results doc already say so. Nothing is waiting on the user except the decision below.
 
-**Round 10 (2026-11-11 afternoon): the Diyanet corrections re-examined, at the user's request. Finished; nothing
-committed; no rule code changed.** The user re-opened the five corrections ("sceptical ... not able to come up with
+**Round 10 (2026-11-11 afternoon): the Diyanet corrections re-examined, at the user's request. Finished, committed
+and pushed by the user as icu4swift `d29e47c`; no rule code changed.** The user re-opened the five corrections ("sceptical ... not able to come up with
 comprehensive formula"). Full write-up: results doc, Round 10. Probes at the end of `CrescentDiyanetProbe.swift`:
 `CrescentDiyanetRound10` (`DIYANET_HISTORY`, `DIYANET_CSV`, `D10_OUT`; ~3 min), `CrescentDiyanetRound10Precise`
 (`D10_PRECISE=1`), `CrescentDiyanetOldMethod` (`D10_OLD_OUT`, optional `D10_OLD_UNTIL=1996`). Data:
@@ -142,13 +142,70 @@ comprehensive formula"). Full write-up: results doc, Round 10. Probes at the end
   others (2032 against Jun 2021 by 2 min; 2023 against May 2030 by 18 min). The altitude side is pinned from both sides
   by four razor-edge decisions. Diyanet's drawn line near America is freehand (20–30° off) and cannot be the input.
 
-**New document started 2026-11-11 at the user's request (uncommitted):** `Docs/Islamic_Crescent_Calendars.md` in the
+**New document, 2026-11-11, at the user's request (pushed by the user as `f7197446`):** `Docs/Islamic_Crescent_Calendars.md` in the
 swift-foundation-islamic worktree, in the style of `Chinese_Family_Calendars.md` and `Fixed_Month_Calendars.md` (a
 permanent document, not under `TEMP_`). It has five short sections, all in the plain words the user asked to keep: what every calculating authority does, a
 criteria table (Diyanet, Umm al-Qura, Malaysia, Indonesia, Singapore) with the three differences, a Diyanet section
 (two questions, the Greenwich deadline, the 2017 America rule, the changes over the years), how the whole Earth is
 checked (the one-line method), and why the sunset line is tilted. The other agent
-has not been told about this file yet.
+has not been told about this file yet; it must pull before its next rebase.
+
+**The user's decision (2026-11-11): proposals (a) and (c); November 1990 stays a correction. Applied, not committed.**
+* Code: `CrescentRules.swift` has `DiyanetEra.before1980` (first days before 1 Jan 1980 decide by the older test:
+  moonset at least 18.5 min after sunset at Mecca, `diyanetOlderTestMinimumLagMinutes`), `years1980to2008` (was
+  `before2009`), and four `diyanetCorrections` (1401-8, 1411-5, 1444-11, 1453-12). One comment in `HijriRegional.swift`.
+* Tests: `CrescentDiyanetPublishedTests` asserts the 1980 boundary, 703 by rule and the four misses; all 15 permanent
+  tests pass. The fixture `crescent_astronomy_fixture.csv` was regenerated (only the Diyanet era labels, the Mecca
+  values of the 14 rows before 1980, and `rule_days` of AH 1399-9 changed).
+* Docs: spec §1 step 0, §4, §5; identifier note (one cell); results doc Round 10 with the decision.
+* For the other agent, in the swift-foundation-islamic worktree: `Docs/TEMP_Islamic_References/round-5/` (README with
+  the change, the evidence and what to change in the port; `data/diyanet_older_test_1960_1995.csv`) and six refreshed
+  files in `round-3/` (spec, proposal, `CrescentRules.swift.txt`, `HijriRegional.swift.txt`,
+  `CrescentDiyanetPublishedTests.swift.txt`, the fixture) plus a pointer in the round-3 README.
+
+Commit commands when the user says so (one-line messages, no attribution):
+
+```
+cd /Users/draganbesevic/Projects/claude/CalendarAPI/icu4swift
+git add Docs/CRESCENT_HANDOFF.md Docs/CRESCENT_RULES_RESULTS.md Docs/CRESCENT_DIYANET_SPEC.md Docs/CRESCENT_ISLAMIC_IDENTIFIER_NOTE.md Sources/CalendarAstronomical/CrescentRules.swift Sources/CalendarAstronomical/HijriRegional.swift Tests/CalendarAstronomicalTests/CrescentDiyanetProbe.swift Tests/CalendarAstronomicalTests/CrescentDiyanetPublishedTests.swift Tests/CalendarAstronomicalTests/crescent_astronomy_fixture.csv
+git commit -m "crescent: Diyanet's 1978 rule starts with the 1980 calendar; an older test decides before it; four named corrections where there were five"
+cd /Users/draganbesevic/Projects/claude/swift-foundation-islamic
+git fetch origin port/islamic-family && git status -sb
+git add Docs/TEMP_Islamic_References/round-3 Docs/TEMP_Islamic_References/round-5
+git commit -m "TEMPORARY: round 5 research results, Diyanet before 1980 and four corrections where there were five, do not merge upstream"
+```
+followed in each repo by `git log -1 --format='%an <%ae>'` (dra8an) and `git log -1 --format=%B | grep -ci 'claude\|co-authored\|anthropic'` (0); the user pushes.
+
+**Lookups by the user on ummulqura.org.sa, all done (2026-11-11, two sittings):** six of our test months, then the
+remaining three of the other agent's list (1 Dhu al-Qa'da 1451, 1 Ramadan 1453, 1 Shawwal 1454) and 1 Muharram 1400.
+All ten show ICU's date; `round-4/` and the results doc already say so. Nothing is waiting on the user except the decision below.
+
+**Round 10 (2026-11-11 afternoon): the Diyanet corrections re-examined, at the user's request. Finished, committed
+and pushed by the user as icu4swift `d29e47c`; no rule code changed.** The user re-opened the five corrections ("sceptical ... not able to come up with
+comprehensive formula"). Full write-up: results doc, Round 10. Probes at the end of `CrescentDiyanetProbe.swift`:
+`CrescentDiyanetRound10` (`DIYANET_HISTORY`, `DIYANET_CSV`, `D10_OUT`; ~3 min), `CrescentDiyanetRound10Precise`
+(`D10_PRECISE=1`), `CrescentDiyanetOldMethod` (`D10_OLD_OUT`, optional `D10_OLD_UNTIL=1996`). Data:
+`Research/crescent/round10-raw/`. What it found:
+* **No single formula can exist.** Each era's rule fits its own era (370/373, 61/61, 38/38, 233/235) and fails every other
+  era by 3–86 months, always one way. The policy for a first visibility after 24:00 UTC changed in 2009, 2014 and 2017.
+* **Ramazan 1979 is not an exception: the 1978 rule starts with the 1980 calendar.** Before 1980 the list follows an
+  older test (simplest form: the moon sets at least 18.5 min after the sun at Mecca): 13/13 for first days in 1978,
+  12/12 in 1979, 234/247 for 1960–1979; the 1978 rule gives 10/13 and 11/12, then 12/12 in 1980 where the older test
+  drops to 9/12. All 14 decisions of the verified range with a first day before 1980 are reproduced by the older test.
+* **Nov 1990:** 46 s before the cut-off in UT, 12 s after it in dynamical time (Moshier longitudes). A pre-2009 program
+  in dynamical time explains it and changes nothing else. One data point.
+* **Jun 1981:** refused 14.1 min before the cut-off; Jul 1993 started 13.8 min before. A real inconsistency.
+* **May 2023, Mar 2032:** no joint shift of the altitude and elongation thresholds reproduces either without breaking
+  others (2032 against Jun 2021 by 2 min; 2023 against May 2030 by 18 min). The altitude side is pinned from both sides
+  by four razor-edge decisions. Diyanet's drawn line near America is freehand (20–30° off) and cannot be the input.
+
+**New document, 2026-11-11, at the user's request (pushed by the user as `f7197446`):** `Docs/Islamic_Crescent_Calendars.md` in the
+swift-foundation-islamic worktree, in the style of `Chinese_Family_Calendars.md` and `Fixed_Month_Calendars.md` (a
+permanent document, not under `TEMP_`). It has five short sections, all in the plain words the user asked to keep: what every calculating authority does, a
+criteria table (Diyanet, Umm al-Qura, Malaysia, Indonesia, Singapore) with the three differences, a Diyanet section
+(two questions, the Greenwich deadline, the 2017 America rule, the changes over the years), how the whole Earth is
+checked (the one-line method), and why the sunset line is tilted. The other agent
+has not been told about this file yet; it must pull before its next rebase.
 
 **Three proposals wait for the user's decision (not applied):** (a) start the 1978 rule at first days from 1 Jan 1980
 and use the older test before it: 703/707, the 1979 correction goes; (b) compare the cut-off in dynamical time for

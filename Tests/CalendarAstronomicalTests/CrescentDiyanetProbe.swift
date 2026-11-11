@@ -1546,7 +1546,13 @@ private func loadStartsFromEnv(_ env: [String: String]) -> [Int: Int64]? {
                 mainland = "mainland margin \(Self.f(best.0)) at \(Self.f(best.1, 2)),\(Self.f(best.2, 3)) sunset \(Self.utc(best.3))"
             }
             let rule = CrescentRules.diyanetMonthLength(start: RataDie(p), next: next, corrections: false)
-            lines.append("diyanet,TR,\(next.year),\(next.month),\(Self.date(p + 28)),\(s - p),\(rule),\(Self.utc(conj)),,,\(Self.f(bestAlt)),,,\(Self.f(e0)),,,00utc line max at \(Self.f(bestLat, 1)) \(Self.f(bestLon, 2)),wellington dawn18 \(Self.utc(dawn)),\(mainland),era \(CrescentRules.DiyanetEra(firstDay: RataDie(p + 29)))")
+            // Before 1980 the decision is the older test: the sunset and the moonset at Mecca, and the minutes between them.
+            var meccaSunset = "", meccaMoonset = ""
+            if CrescentRules.DiyanetEra(firstDay: RataDie(p + 29)) == .before1980, let e = CrescentRules.evening(day, at: CrescentRules.makkah) {
+                meccaSunset = Self.utc(e.sunset); meccaMoonset = Self.utc(e.moonset)
+                mainland = "mecca lag min \(Self.f(e.lagMinutes, 2))"
+            }
+            lines.append("diyanet,TR,\(next.year),\(next.month),\(Self.date(p + 28)),\(s - p),\(rule),\(Self.utc(conj)),\(meccaSunset),\(meccaMoonset),\(Self.f(bestAlt)),,,\(Self.f(e0)),,,00utc line max at \(Self.f(bestLat, 1)) \(Self.f(bestLon, 2)),wellington dawn18 \(Self.utc(dawn)),\(mainland),era \(CrescentRules.DiyanetEra(firstDay: RataDie(p + 29)))")
         }
         // Umm al-Qura at the Kaaba.
         let uq = starts("ummalqura", "ummalqura")
