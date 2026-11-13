@@ -1,7 +1,8 @@
 # Islamic crescent rules and the Islamic calendars presentation — session handoff
 
-Last update: 2026-11-11, evening. Read this file first. **The next task is the presentation (§6.1)**; for it, read
-`Docs/ISLAMIC_CALENDARS_DECK_BRIEF.md` next. The crescent research (§5, §6.2) is finished for now and waits for the
+Last update: 2026-11-12 (this paragraph and one note in §6.1 only; the rest is as of 2026-11-11, evening). Read this
+file first. **The presentation (§6.1) was built on 2026-11-12 and waits for the user's look**; its live state is the
+"Where we are" section of `Docs/ISLAMIC_CALENDARS_DECK_BRIEF.md`, which you read next. The crescent research (§5, §6.2) is finished for now and waits for the
 other agent. Its evidence is `Docs/CRESCENT_RULES_RESULTS.md` (rounds 1–10); what the port should do is
 `Docs/CRESCENT_DIYANET_SPEC.md` and `Docs/CRESCENT_ISLAMIC_IDENTIFIER_NOTE.md`.
 
@@ -120,7 +121,13 @@ as a bound on Diyanet, joint shifts of the altitude and elongation thresholds, t
 
 ## 6. NEXT STEP
 
-### 6.1 The presentation (next task; nothing built; the user has not yet said go for building)
+### 6.1 The presentation (built 2026-11-12; waiting for the user's look)
+
+**Update 2026-11-12:** the user said go; the deck is built and was saved as **alpha** the same day:
+`Research/presentation/releases/alpha/` (frozen; 24 slides, slide 16 a 40-second film, a printable speaker's script;
+its `MANIFEST.md` lists everything). The working copy is `Research/presentation/deck/the_twenty_ninth_evening.pptx`. Everything below in this section is the starting position of 2026-11-11 and is kept as history; the current
+state, the decisions and how to rebuild are in the brief's "Where we are" section. icu4swift is level with origin at
+`6194df9`; this file and the brief are modified and uncommitted.
 
 Read `Docs/ISLAMIC_CALENDARS_DECK_BRIEF.md` in full. In short:
 
