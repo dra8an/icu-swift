@@ -10,8 +10,10 @@ that builds the deck.
 the printable script, every source file, the exact library versions, and `MANIFEST.md` with checksums, what was
 checked and what is open. The same as one file: `Research/presentation/releases/the_twenty_ninth_evening_alpha.zip`.
 **Never edit anything under `releases/alpha/`;** work goes on in `art/`, `deck/`, `tools/`, `engine/`, and the next
-frozen copy gets its own folder (`releases/beta/`, …). The build folder is git-excluded, so the alpha exists only on
-this machine and in that zip; whether the sources go into git is the user's decision and was put to them (not decided).
+frozen copy gets its own folder (`releases/beta/`, …). The build folder is git-excluded, so on 2026-11-13 the user decided the alpha belongs in source control ("that is
+worth saving it in source control"): an exact copy of `releases/alpha/` is the tracked folder **`Presentation/alpha/`**
+(with `Presentation/README.md`). Later versions are saved the same way: freeze in `releases/<name>/`, copy to
+`Presentation/<name>/`. Told to the user first: the repository is public, and each version adds about 33 MB.
 
 **2026-11-11, late evening: the user said go.** Build started. The user may not have 5 to 7 hours in one piece, so the
 work is cut into steps that each leave finished files in `Research/presentation/`; stop after any step, and write the
